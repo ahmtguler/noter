@@ -8,7 +8,14 @@ struct PreferencesView: View {
     @ObservedObject var app: AppViewModel
 
     @AppStorage(SettingsKey.subfolder) private var subfolder = SettingsKey.defaultSubfolder
+    @AppStorage(SettingsKey.idleNewNoteMinutes)
+    private var idleNewNoteMinutes = SettingsKey.defaultIdleNewNoteMinutes
     @State private var vaultDisplay = ""
+
+    private let idleHelp = """
+    After the popup has been hidden this long, the next time you open it you'll get a blank draft instead of \
+    resuming the last note. Set to 0 to always resume.
+    """
 
     var body: some View {
         Form {
@@ -38,9 +45,28 @@ struct PreferencesView: View {
                     KeyboardShortcuts.Recorder(for: .toggleNoter)
                 }
             }
+
+            Section("Behavior") {
+                LabeledContent("Reset to a fresh note after") {
+                    HStack(spacing: 6) {
+                        Stepper(
+                            value: $idleNewNoteMinutes,
+                            in: 0 ... 240,
+                            step: 1
+                        ) {
+                            Text("\(idleNewNoteMinutes) min")
+                                .monospacedDigit()
+                                .frame(minWidth: 60, alignment: .leading)
+                        }
+                    }
+                }
+                Text(idleHelp)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 480, height: 320)
+        .frame(width: 520, height: 420)
         .onAppear { refreshVaultDisplay() }
     }
 

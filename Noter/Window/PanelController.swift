@@ -9,6 +9,13 @@ final class PanelController: NSObject {
     private var panel: PopupPanel?
     private let defaults: UserDefaults
     private let contentFactory: ContentFactory
+    private(set) var lastHiddenAt: Date?
+    /// Suppresses hide-on-blur briefly after a programmatic show so transient
+    /// activation glitches (LSUIElement apps don't reliably hold key focus
+    /// across modal-window close transitions) don't dismiss the panel.
+    private var suppressHideUntil: Date?
+    private let suppressHideWindow: TimeInterval = 0.6
+    var onWillShow: (() -> Void)?
 
     init(
         defaults: UserDefaults = .standard,
@@ -21,19 +28,25 @@ final class PanelController: NSObject {
 
     func toggle() {
         if let panel, panel.isVisible {
-            panel.orderOut(nil)
+            hide()
         } else {
             show()
         }
     }
 
     func show() {
+        onWillShow?()
         let panel = ensurePanel()
         restoreFrame(into: panel)
+        suppressHideUntil = Date().addingTimeInterval(suppressHideWindow)
+        // LSUIElement apps don't auto-activate; without this the panel can
+        // appear and immediately receive a spurious resignKey.
+        NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
     }
 
     func hide() {
+        lastHiddenAt = Date()
         panel?.orderOut(nil)
     }
 
@@ -83,8 +96,10 @@ extension PanelController: NSWindowDelegate {
     }
 
     func windowDidResignKey(_: Notification) {
-        // Hide on focus loss unless the user has pinned the panel.
         guard !defaults.bool(forKey: SettingsKey.pinned) else { return }
-        panel?.orderOut(nil)
+        if let suppressUntil = suppressHideUntil, Date() < suppressUntil {
+            return
+        }
+        hide()
     }
 }

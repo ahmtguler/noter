@@ -64,18 +64,16 @@ struct RootView: View {
     }
 
     private func ensureAnOpenNote() {
-        if app.editor.currentNote != nil { return }
+        if app.editor.currentNote != nil || !app.editor.body.isEmpty { return }
         if let first = app.store.notes.first {
             app.editor.open(first)
         } else {
-            createAndOpenNewNote()
+            // First launch: blank draft. Disk write happens after the user types.
+            app.editor.startBlankDraft()
         }
     }
 
     private func createAndOpenNewNote() {
-        app.editor.flush()
-        if let new = try? app.store.createNote() {
-            app.editor.open(new)
-        }
+        app.editor.startBlankDraft()
     }
 }
