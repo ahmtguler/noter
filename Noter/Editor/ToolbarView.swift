@@ -1,70 +1,76 @@
 import AppKit
+import MarkdownEditor
 import SwiftUI
 
-/// Bottom formatting toolbar. Each control invokes `EditorCommands` so it
-/// operates on the current selection. Active styles are indicated by a
-/// brighter (full-label-color) tint instead of an accent-color highlight.
+/// Bottom formatting toolbar. Each control invokes a method on
+/// `MarkdownCommands` (provided by the editor package), which dispatches the
+/// corresponding command into CodeMirror. Active styles light up at full
+/// label color while inactive buttons sit at a dim secondary tint.
 struct ToolbarView: View {
-    @ObservedObject var commands: EditorCommands
+    @ObservedObject var commands: MarkdownCommands
 
     var body: some View {
         HStack(spacing: 2) {
-            headingButton(level: 1, label: "H1")
-            headingButton(level: 2, label: "H2")
-            headingButton(level: 3, label: "H3")
+            headingButton(level: 1, label: "H1", style: .heading1)
+            headingButton(level: 2, label: "H2", style: .heading2)
+            headingButton(level: 3, label: "H3", style: .heading3)
             divider
-            iconButton(
-                "bold",
-                help: "Bold (⌘B)",
-                isActive: commands.activeStyles.contains(.bold)
-            ) { commands.wrap(prefix: "**") }
-            iconButton(
-                "italic",
-                help: "Italic (⌘I)",
-                isActive: commands.activeStyles.contains(.italic)
-            ) { commands.wrap(prefix: "*") }
-            iconButton(
-                "underline",
-                help: "Underline (⌘U)",
-                isActive: commands.activeStyles.contains(.underline)
-            ) { commands.wrap(prefix: "<u>", suffix: "</u>") }
+            iconButton("bold", help: "Bold (⌘B)", isActive: isActive(.bold)) {
+                commands.bold()
+            }
+            iconButton("italic", help: "Italic (⌘I)", isActive: isActive(.italic)) {
+                commands.italic()
+            }
+            iconButton("underline", help: "Underline (⌘U)", isActive: isActive(.underline)) {
+                commands.underline()
+            }
             iconButton(
                 "strikethrough",
                 help: "Strikethrough (⇧⌘X)",
-                isActive: commands.activeStyles.contains(.strikethrough)
-            ) { commands.wrap(prefix: "~~") }
+                isActive: isActive(.strikethrough)
+            ) {
+                commands.strikethrough()
+            }
             iconButton(
                 "chevron.left.forwardslash.chevron.right",
                 help: "Inline code",
-                isActive: commands.activeStyles.contains(.code)
-            ) { commands.wrap(prefix: "`") }
+                isActive: isActive(.code)
+            ) {
+                commands.code()
+            }
             divider
             iconButton(
                 "list.bullet",
                 help: "Bullet list (⇧⌘8)",
-                isActive: commands.activeStyles.contains(.bulletList)
-            ) { commands.toggleLinePrefix("- ") }
+                isActive: isActive(.bulletList)
+            ) {
+                commands.bulletList()
+            }
             iconButton(
                 "list.number",
                 help: "Numbered list (⇧⌘7)",
-                isActive: commands.activeStyles.contains(.numberedList)
-            ) { commands.toggleLinePrefix("1. ") }
+                isActive: isActive(.numberedList)
+            ) {
+                commands.numberedList()
+            }
             iconButton(
                 "checklist",
                 help: "To-do (⇧⌘T)",
-                isActive: commands.activeStyles.contains(.todoList)
-            ) { commands.insertTodo() }
+                isActive: isActive(.todoList)
+            ) {
+                commands.todo()
+            }
             iconButton(
                 "quote.opening",
                 help: "Quote (⇧⌘9)",
-                isActive: commands.activeStyles.contains(.quote)
-            ) { commands.toggleLinePrefix("> ") }
+                isActive: isActive(.quote)
+            ) {
+                commands.quote()
+            }
             divider
-            iconButton(
-                "link",
-                help: "Link (⌘K)",
-                isActive: false
-            ) { commands.insertLink() }
+            iconButton("link", help: "Link (⌘K)", isActive: false) {
+                commands.link()
+            }
             Spacer()
         }
         .padding(.horizontal, 12)
@@ -81,13 +87,17 @@ struct ToolbarView: View {
             .padding(.horizontal, 4)
     }
 
-    private func headingButton(level: Int, label: String) -> some View {
+    private func isActive(_ style: MarkdownStyle) -> Bool {
+        commands.activeStyles.contains(style)
+    }
+
+    private func headingButton(level: Int, label: String, style: MarkdownStyle) -> some View {
         ToolbarTextButton(
             title: label,
             tooltip: "Heading \(level) (⌥⌘\(level))",
-            isActive: commands.activeStyles.contains(.heading(level))
+            isActive: isActive(style)
         ) {
-            commands.setHeading(level: level)
+            commands.heading(level)
         }
     }
 
@@ -110,9 +120,8 @@ private let activeColor = NSColor.labelColor
 private let inactiveColor = NSColor.secondaryLabelColor.withAlphaComponent(0.7)
 
 /// `NSButton` subclass that refuses to become first responder. Without this,
-/// clicking a toolbar button shifts the window's first responder to the button,
-/// dropping the text-view selection. Keeping focus on the editor lets every
-/// command operate on the active selection.
+/// clicking a toolbar button shifts the window's first responder away from
+/// the editor and drops the selection.
 final class FocusPreservingButton: NSButton {
     override var refusesFirstResponder: Bool {
         get { true }
@@ -124,9 +133,6 @@ final class FocusPreservingButton: NSButton {
     }
 }
 
-/// Borderless icon button with an explicit `toolTip` set on the underlying
-/// NSButton — SwiftUI's `.help()` wasn't reliably materialising on borderless
-/// buttons in the macOS 26 builds we tested.
 private struct ToolbarIconButton: NSViewRepresentable {
     let symbol: String
     let tooltip: String
@@ -175,8 +181,6 @@ private struct ToolbarIconButton: NSViewRepresentable {
     }
 }
 
-/// Same as `ToolbarIconButton` but renders a short text title (H1 / H2 / H3)
-/// instead of an SF Symbol.
 private struct ToolbarTextButton: NSViewRepresentable {
     let title: String
     let tooltip: String

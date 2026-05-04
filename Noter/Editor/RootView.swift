@@ -1,4 +1,5 @@
 import AppKit
+import MarkdownEditor
 import SwiftUI
 
 /// Main popup content: title bar at the top with the current note's filename
@@ -7,15 +8,26 @@ import SwiftUI
 struct RootView: View {
     @ObservedObject var app: AppViewModel
     @State private var showSwitcher = false
+    @StateObject private var commandsHolder = CommandsHolder()
     @AppStorage(SettingsKey.pinned) private var pinned = false
-    @StateObject private var commands = EditorCommands()
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 0) {
                 titleBar
-                EditorView(text: $app.editor.body, commands: commands)
-                ToolbarView(commands: commands)
+                MarkdownEditor(
+                    text: $app.editor.body,
+                    configuration: editorConfiguration
+                ) { commands in
+                    commandsHolder.commands = commands
+                }
+                Group {
+                    if let commands = commandsHolder.commands {
+                        ToolbarView(commands: commands)
+                    } else {
+                        Color.clear.frame(height: 36)
+                    }
+                }
             }
 
             if showSwitcher {
@@ -40,9 +52,20 @@ struct RootView: View {
         .onAppear { ensureAnOpenNote() }
     }
 
+    private var editorConfiguration: EditorConfiguration {
+        EditorConfiguration(
+            theme: .system,
+            fontSize: 14,
+            spellCheck: true,
+            smartListContinuation: true,
+            revealMarkersOnCursor: true,
+            lineWrap: true,
+            contentPadding: 24
+        )
+    }
+
     private var titleBar: some View {
         ZStack {
-            // Drag region: the entire title bar is grabbable.
             WindowDragRegion()
             HStack(spacing: 6) {
                 Spacer(minLength: 12)
@@ -128,6 +151,14 @@ struct RootView: View {
     private func createAndOpenNewNote() {
         app.editor.startBlankDraft()
     }
+}
+
+/// Holds the `MarkdownCommands` produced by the editor once it's mounted.
+/// The view binds to it via @StateObject so the toolbar updates as soon as
+/// the editor publishes its commands.
+@MainActor
+final class CommandsHolder: ObservableObject {
+    @Published var commands: MarkdownCommands?
 }
 
 /// Lets the title bar serve as a window-drag handle. AppKit normally provides
