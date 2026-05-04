@@ -1,17 +1,23 @@
 import SwiftUI
 
 /// Main popup content: the editor on top, the formatting toolbar below.
-/// ⌘P brings up the note switcher; ⌘N creates a new note.
+/// ⌘P brings up the note switcher; ⌘N creates a new note. The pin button in
+/// the top-right corner overrides hide-on-blur.
 struct RootView: View {
     @ObservedObject var app: AppViewModel
     @State private var showSwitcher = false
+    @AppStorage(SettingsKey.pinned) private var pinned = false
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .topTrailing) {
             VStack(spacing: 0) {
                 EditorView(text: $app.editor.body)
                 ToolbarView(text: $app.editor.body)
             }
+
+            pinToggle
+                .padding(.top, 8)
+                .padding(.trailing, 12)
 
             if showSwitcher {
                 Color.black.opacity(0.001)
@@ -27,6 +33,21 @@ struct RootView: View {
         .frame(minWidth: 360, minHeight: 320)
         .background(hiddenShortcuts)
         .onAppear { ensureAnOpenNote() }
+    }
+
+    private var pinToggle: some View {
+        Button {
+            pinned.toggle()
+        } label: {
+            Image(systemName: pinned ? "pin.fill" : "pin")
+                .foregroundStyle(pinned ? AnyShapeStyle(Color.accentColor) :
+                    AnyShapeStyle(HierarchicalShapeStyle.secondary))
+                .font(.system(size: 14, weight: .medium))
+                .padding(6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(pinned ? "Unpin (hide on focus loss)" : "Pin (keep on top)")
     }
 
     private var hiddenShortcuts: some View {
