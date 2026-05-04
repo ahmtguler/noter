@@ -51,38 +51,34 @@ final class MarkdownStyler: NSObject, NSTextStorageDelegate {
 
         let plainText = (storage.string as NSString).substring(with: scopedRange)
 
+        let italicFont = NSFontManager.shared.font(
+            withFamily: bodyFont.familyName ?? "System",
+            traits: .italicFontMask,
+            weight: 5,
+            size: bodyFont.pointSize
+        ) ?? bodyFont
+
         applyHeadings(plainText: plainText, base: scopedRange.location, on: storage)
         applyInline(
             pattern: #"\*\*([^*\n]+)\*\*"#,
             plainText: plainText,
             base: scopedRange.location,
-            on: storage,
             attrs: [.font: NSFont.boldSystemFont(ofSize: bodyFont.pointSize)],
-            dimGroup: 0
+            on: storage
         )
         applyInline(
             pattern: #"(?<!\*)\*([^*\n]+)\*(?!\*)"#,
             plainText: plainText,
             base: scopedRange.location,
-            on: storage,
-            attrs: [.font: NSFontManager.shared.font(
-                withFamily: bodyFont.familyName ?? "System",
-                traits: .italicFontMask,
-                weight: 5,
-                size: bodyFont.pointSize
-            ) ?? bodyFont],
-            dimGroup: 0
+            attrs: [.font: italicFont],
+            on: storage
         )
         applyInline(
             pattern: #"`([^`\n]+)`"#,
             plainText: plainText,
             base: scopedRange.location,
-            on: storage,
-            attrs: [
-                .font: monoFont,
-                .backgroundColor: codeBackground
-            ],
-            dimGroup: 0
+            attrs: [.font: monoFont, .backgroundColor: codeBackground],
+            on: storage
         )
         applyBlockquotes(plainText: plainText, base: scopedRange.location, on: storage)
         applyLinks(plainText: plainText, base: scopedRange.location, on: storage)
