@@ -22,6 +22,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 
 import { applyCommand } from "./commands";
 import { detectActiveStyles } from "./detectStyles";
+import { livePreviewPlugin } from "./livePreview";
 import { buildTheme, EditorAppearance } from "./theme";
 
 declare global {
@@ -103,6 +104,7 @@ function bootstrap() {
             bracketMatching(),
             markdown({ base: markdownLanguage, codeLanguages: [], addKeymap: true }),
             syntaxHighlighting(defaultHighlightStyle),
+            livePreviewPlugin,
             keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
             wrapCompartment.of(EditorView.lineWrapping),
             themeCompartment.of(buildTheme(initialAppearance)),
