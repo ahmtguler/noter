@@ -54,9 +54,9 @@ struct RootView: View {
                 Spacer(minLength: 12)
             }
             HStack {
-                pinToggle
-                Spacer()
                 closeButton
+                Spacer()
+                pinToggle
             }
             .padding(.horizontal, 10)
         }

@@ -1,14 +1,17 @@
+import AppKit
 import SwiftUI
 
 /// Bottom formatting toolbar. Each control invokes `EditorCommands` so it
-/// operates on the current selection. Buttons highlight when the matching
-/// style applies to the caret position.
+/// operates on the current selection. Active styles are indicated by a
+/// brighter (full-label-color) tint instead of an accent-color highlight.
 struct ToolbarView: View {
     @ObservedObject var commands: EditorCommands
 
     var body: some View {
         HStack(spacing: 2) {
-            headingMenu
+            headingButton(level: 1, label: "H1")
+            headingButton(level: 2, label: "H2")
+            headingButton(level: 3, label: "H3")
             divider
             iconButton(
                 "bold",
@@ -65,7 +68,8 @@ struct ToolbarView: View {
             Spacer()
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 7)
+        .padding(.vertical, 6)
+        .frame(height: 36)
         .background(.ultraThinMaterial)
         .overlay(Divider(), alignment: .top)
     }
@@ -77,33 +81,13 @@ struct ToolbarView: View {
             .padding(.horizontal, 4)
     }
 
-    private var headingMenu: some View {
-        Menu {
-            Button("Heading 1") { commands.setHeading(level: 1) }
-                .keyboardShortcut("1", modifiers: [.command, .option])
-            Button("Heading 2") { commands.setHeading(level: 2) }
-                .keyboardShortcut("2", modifiers: [.command, .option])
-            Button("Heading 3") { commands.setHeading(level: 3) }
-                .keyboardShortcut("3", modifiers: [.command, .option])
-        } label: {
-            HStack(spacing: 2) {
-                Image(systemName: "textformat.size")
-                Image(systemName: "chevron.down").font(.caption2)
-            }
-            .foregroundStyle(headingActive ? AnyShapeStyle(Color.accentColor) :
-                AnyShapeStyle(HierarchicalShapeStyle.secondary))
-            .frame(width: 36, height: 22)
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .help("Heading level")
-    }
-
-    private var headingActive: Bool {
-        commands.activeStyles.contains { style in
-            if case .heading = style { return true }
-            return false
+    private func headingButton(level: Int, label: String) -> some View {
+        ToolbarTextButton(
+            title: label,
+            tooltip: "Heading \(level) (⌥⌘\(level))",
+            isActive: commands.activeStyles.contains(.heading(level))
+        ) {
+            commands.setHeading(level: level)
         }
     }
 
@@ -122,9 +106,12 @@ struct ToolbarView: View {
     }
 }
 
+private let activeColor = NSColor.labelColor
+private let inactiveColor = NSColor.secondaryLabelColor.withAlphaComponent(0.7)
+
 /// Borderless icon button with an explicit `toolTip` set on the underlying
-/// NSButton — SwiftUI's `.help()` doesn't always materialise on borderless
-/// buttons in macOS 26 builds we've seen.
+/// NSButton — SwiftUI's `.help()` wasn't reliably materialising on borderless
+/// buttons in the macOS 26 builds we tested.
 private struct ToolbarIconButton: NSViewRepresentable {
     let symbol: String
     let tooltip: String
@@ -138,6 +125,11 @@ private struct ToolbarIconButton: NSViewRepresentable {
         button.imagePosition = .imageOnly
         button.target = context.coordinator
         button.action = #selector(Coordinator.click)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: 28),
+            button.heightAnchor.constraint(equalToConstant: 22)
+        ])
         return button
     }
 
@@ -148,8 +140,56 @@ private struct ToolbarIconButton: NSViewRepresentable {
         let symbolImage = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)?
             .withSymbolConfiguration(config)
         button.image = symbolImage
-        button.contentTintColor = isActive ? NSColor.controlAccentColor : NSColor.secondaryLabelColor
-        button.setFrameSize(NSSize(width: 28, height: 22))
+        button.contentTintColor = isActive ? activeColor : inactiveColor
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(action: action)
+    }
+
+    final class Coordinator: NSObject {
+        var action: () -> Void
+
+        init(action: @escaping () -> Void) {
+            self.action = action
+        }
+
+        @objc func click() {
+            action()
+        }
+    }
+}
+
+/// Same as `ToolbarIconButton` but renders a short text title (H1 / H2 / H3)
+/// instead of an SF Symbol.
+private struct ToolbarTextButton: NSViewRepresentable {
+    let title: String
+    let tooltip: String
+    let isActive: Bool
+    let action: () -> Void
+
+    func makeNSView(context: Context) -> NSButton {
+        let button = NSButton()
+        button.bezelStyle = .smallSquare
+        button.isBordered = false
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.click)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: 28),
+            button.heightAnchor.constraint(equalToConstant: 22)
+        ])
+        return button
+    }
+
+    func updateNSView(_ button: NSButton, context: Context) {
+        context.coordinator.action = action
+        button.toolTip = tooltip
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
+            .foregroundColor: isActive ? activeColor : inactiveColor
+        ]
+        button.attributedTitle = NSAttributedString(string: title, attributes: attrs)
     }
 
     func makeCoordinator() -> Coordinator {
