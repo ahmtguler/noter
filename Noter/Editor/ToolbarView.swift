@@ -1,26 +1,66 @@
 import SwiftUI
 
-/// Bottom toolbar with markdown formatting shortcuts. Matches the style of the
-/// Raycast Notes screenshot — compact icon buttons, mostly insert-syntax actions.
+/// Bottom formatting toolbar. Each control invokes `EditorCommands` so it
+/// operates on the current selection, just like keyboard shortcuts.
 struct ToolbarView: View {
-    @Binding var text: String
+    let commands: EditorCommands
 
     var body: some View {
-        HStack(spacing: 4) {
-            iconButton("h.square", help: "Heading") { wrapLinePrefix("# ") }
-            iconButton("bold", help: "Bold") { wrapInline("**") }
-            iconButton("italic", help: "Italic") { wrapInline("*") }
-            iconButton("list.bullet", help: "Bullet list") { wrapLinePrefix("- ") }
-            iconButton("list.number", help: "Numbered list") { wrapLinePrefix("1. ") }
-            iconButton("quote.opening", help: "Quote") { wrapLinePrefix("> ") }
-            iconButton("chevron.left.forwardslash.chevron.right", help: "Inline code") { wrapInline("`") }
-            iconButton("link", help: "Link") { insert("[]()") }
+        HStack(spacing: 2) {
+            headingMenu
+            Divider().frame(height: 16)
+            iconButton("bold", help: "Bold (⌘B)") { commands.wrap(prefix: "**") }
+            iconButton("italic", help: "Italic (⌘I)") { commands.wrap(prefix: "*") }
+            iconButton("underline", help: "Underline (⌘U)") {
+                commands.wrap(prefix: "<u>", suffix: "</u>")
+            }
+            iconButton("strikethrough", help: "Strikethrough (⇧⌘X)") {
+                commands.wrap(prefix: "~~")
+            }
+            iconButton("chevron.left.forwardslash.chevron.right", help: "Inline code") {
+                commands.wrap(prefix: "`")
+            }
+            Divider().frame(height: 16)
+            iconButton("list.bullet", help: "Bullet list (⇧⌘8)") {
+                commands.toggleLinePrefix("- ")
+            }
+            iconButton("list.number", help: "Numbered list (⇧⌘7)") {
+                commands.toggleLinePrefix("1. ")
+            }
+            iconButton("checklist", help: "To-do (⇧⌘T)") {
+                commands.insertTodo()
+            }
+            iconButton("quote.opening", help: "Quote (⇧⌘9)") {
+                commands.toggleLinePrefix("> ")
+            }
+            Divider().frame(height: 16)
+            iconButton("link", help: "Link (⌘K)") { commands.insertLink() }
             Spacer()
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, 7)
         .background(.ultraThinMaterial)
         .overlay(Divider(), alignment: .top)
+    }
+
+    private var headingMenu: some View {
+        Menu {
+            ForEach(1 ... 6, id: \.self) { level in
+                Button("Heading \(level)") { commands.setHeading(level: level) }
+                    .keyboardShortcut(KeyEquivalent(Character("\(level)")), modifiers: [.command, .option])
+            }
+        } label: {
+            HStack(spacing: 2) {
+                Image(systemName: "textformat.size")
+                Image(systemName: "chevron.down").font(.caption2)
+            }
+            .foregroundStyle(.secondary)
+            .frame(width: 36, height: 22)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Heading level")
     }
 
     private func iconButton(
@@ -35,21 +75,5 @@ struct ToolbarView: View {
         .buttonStyle(.borderless)
         .foregroundStyle(.secondary)
         .help(help)
-    }
-
-    private func wrapInline(_ marker: String) {
-        text += marker + marker
-    }
-
-    private func wrapLinePrefix(_ prefix: String) {
-        if text.isEmpty || text.hasSuffix("\n") {
-            text += prefix
-        } else {
-            text += "\n" + prefix
-        }
-    }
-
-    private func insert(_ snippet: String) {
-        text += snippet
     }
 }

@@ -1,24 +1,30 @@
 import AppKit
 
-/// Floating, non-activating panel that hosts the editor. Mimics Raycast's popup behavior:
-/// the panel can take key focus without activating the app, so the user's previous app
-/// stays in front when the panel hides.
-final class PopupPanel: NSPanel {
+/// Popup window for the editor — translucent, floating, joins all spaces.
+/// Backed by an `NSWindow` (not `NSPanel`) for reliability across macOS releases.
+final class PopupPanel: NSWindow {
     init() {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 640),
-            styleMask: [.titled, .closable, .resizable, .fullSizeContentView, .nonactivatingPanel],
+            contentRect: NSRect(x: 0, y: 0, width: 540, height: 660),
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        isFloatingPanel = true
         level = .floating
         hidesOnDeactivate = false
-        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .moveToActiveSpace]
+        // .canJoinAllSpaces and .moveToActiveSpace are mutually exclusive —
+        // setting both throws NSInternalInconsistencyException at runtime.
+        collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         titlebarAppearsTransparent = true
         titleVisibility = .hidden
-        isMovableByWindowBackground = false
+        isMovableByWindowBackground = true
+        isReleasedWhenClosed = false
         animationBehavior = .utilityWindow
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = true
+        standardWindowButton(.miniaturizeButton)?.isHidden = true
+        standardWindowButton(.zoomButton)?.isHidden = true
     }
 
     override var canBecomeKey: Bool {
@@ -26,6 +32,6 @@ final class PopupPanel: NSPanel {
     }
 
     override var canBecomeMain: Bool {
-        false
+        true
     }
 }
