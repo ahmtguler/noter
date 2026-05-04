@@ -109,6 +109,21 @@ struct ToolbarView: View {
 private let activeColor = NSColor.labelColor
 private let inactiveColor = NSColor.secondaryLabelColor.withAlphaComponent(0.7)
 
+/// `NSButton` subclass that refuses to become first responder. Without this,
+/// clicking a toolbar button shifts the window's first responder to the button,
+/// dropping the text-view selection. Keeping focus on the editor lets every
+/// command operate on the active selection.
+final class FocusPreservingButton: NSButton {
+    override var refusesFirstResponder: Bool {
+        get { true }
+        set {}
+    }
+
+    override var acceptsFirstResponder: Bool {
+        false
+    }
+}
+
 /// Borderless icon button with an explicit `toolTip` set on the underlying
 /// NSButton — SwiftUI's `.help()` wasn't reliably materialising on borderless
 /// buttons in the macOS 26 builds we tested.
@@ -119,7 +134,7 @@ private struct ToolbarIconButton: NSViewRepresentable {
     let action: () -> Void
 
     func makeNSView(context: Context) -> NSButton {
-        let button = NSButton()
+        let button = FocusPreservingButton()
         button.bezelStyle = .smallSquare
         button.isBordered = false
         button.imagePosition = .imageOnly
@@ -169,7 +184,7 @@ private struct ToolbarTextButton: NSViewRepresentable {
     let action: () -> Void
 
     func makeNSView(context: Context) -> NSButton {
-        let button = NSButton()
+        let button = FocusPreservingButton()
         button.bezelStyle = .smallSquare
         button.isBordered = false
         button.target = context.coordinator
