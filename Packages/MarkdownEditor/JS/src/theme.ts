@@ -46,11 +46,36 @@ export function buildTheme(appearance: EditorAppearance): Extension {
                 fontFamily: "inherit",
                 overflowX: "hidden",
                 overflowY: "auto",
-                paddingRight: "0",
             },
+            // Inset the scroll area so the scrollbar sits a few pixels from
+            // the panel's right edge instead of touching it.
+            ".cm-editor": { paddingRight: "4px" },
             ".cm-line": { padding: "0" },
             ".cm-link": { color: accent, textDecoration: "none" },
-            ".cm-bullet-widget": { color: secondary, fontWeight: "600" },
+            ".cm-bullet-widget": { color: accent, fontWeight: "700", marginRight: "0px" },
+            ".cm-numbered-marker": { color: accent, fontWeight: "600" },
+            ".cm-task-checkbox": {
+                display: "inline-block",
+                width: "14px",
+                height: "14px",
+                border: `1.5px solid ${secondary}`,
+                borderRadius: "3px",
+                textAlign: "center",
+                lineHeight: "11px",
+                fontSize: "10px",
+                fontWeight: "700",
+                cursor: "pointer",
+                marginRight: "6px",
+                userSelect: "none",
+                verticalAlign: "-2px",
+                color: "transparent",
+                transition: "background-color 0.1s, border-color 0.1s",
+            },
+            ".cm-task-checkbox-checked": {
+                backgroundColor: accent,
+                borderColor: accent,
+                color: "white",
+            },
             // Subtle scrollbar that hugs the right edge and dims when not hovered.
             ".cm-scroller::-webkit-scrollbar": {
                 width: "6px",

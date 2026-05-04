@@ -2,27 +2,27 @@ import AppKit
 import MarkdownEditor
 import SwiftUI
 
-/// Bottom formatting toolbar. Each control invokes a method on
-/// `MarkdownCommands` (provided by the editor package), which dispatches the
-/// corresponding command into CodeMirror. Active styles light up at full
-/// label color while inactive buttons sit at a dim secondary tint.
+/// Bottom formatting toolbar. Centered horizontally with three groups:
+/// 1. Headings + inline formatting (bold/italic/strike/underline) + link
+/// 2. Code block + inline code + blockquote
+/// 3. Lists (bullet / numbered / todo)
+///
+/// Each control invokes a method on `MarkdownCommands`. Active styles render
+/// at full label color with a soft accent-tinted pill background.
 struct ToolbarView: View {
     @ObservedObject var commands: MarkdownCommands
 
     var body: some View {
         HStack(spacing: 2) {
+            Spacer(minLength: 8)
             headingButton(level: 1, label: "H1", style: .heading1)
             headingButton(level: 2, label: "H2", style: .heading2)
             headingButton(level: 3, label: "H3", style: .heading3)
-            divider
             iconButton("bold", help: "Bold (⌘B)", isActive: isActive(.bold)) {
                 commands.bold()
             }
             iconButton("italic", help: "Italic (⌘I)", isActive: isActive(.italic)) {
                 commands.italic()
-            }
-            iconButton("underline", help: "Underline (⌘U)", isActive: isActive(.underline)) {
-                commands.underline()
             }
             iconButton(
                 "strikethrough",
@@ -31,12 +31,25 @@ struct ToolbarView: View {
             ) {
                 commands.strikethrough()
             }
+            iconButton("underline", help: "Underline (⌘U)", isActive: isActive(.underline)) {
+                commands.underline()
+            }
+            iconButton("link", help: "Link (⌘K)", isActive: false) {
+                commands.link()
+            }
+            divider
+            iconButton("curlybraces", help: "Code block", isActive: false) {
+                commands.codeBlock()
+            }
             iconButton(
                 "chevron.left.forwardslash.chevron.right",
                 help: "Inline code",
                 isActive: isActive(.code)
             ) {
                 commands.code()
+            }
+            iconButton("quote.opening", help: "Quote (⇧⌘9)", isActive: isActive(.quote)) {
+                commands.quote()
             }
             divider
             iconButton(
@@ -53,27 +66,12 @@ struct ToolbarView: View {
             ) {
                 commands.numberedList()
             }
-            iconButton(
-                "checklist",
-                help: "To-do (⇧⌘T)",
-                isActive: isActive(.todoList)
-            ) {
+            iconButton("checklist", help: "To-do (⇧⌘T)", isActive: isActive(.todoList)) {
                 commands.todo()
             }
-            iconButton(
-                "quote.opening",
-                help: "Quote (⇧⌘9)",
-                isActive: isActive(.quote)
-            ) {
-                commands.quote()
-            }
-            divider
-            iconButton("link", help: "Link (⌘K)", isActive: false) {
-                commands.link()
-            }
-            Spacer()
+            Spacer(minLength: 8)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .frame(height: 36)
         .background(.ultraThinMaterial)
@@ -84,7 +82,7 @@ struct ToolbarView: View {
         Rectangle()
             .fill(.separator)
             .frame(width: 1, height: 16)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 6)
     }
 
     private func isActive(_ style: MarkdownStyle) -> Bool {
@@ -116,8 +114,12 @@ struct ToolbarView: View {
     }
 }
 
-private let activeColor = NSColor.labelColor
-private let inactiveColor = NSColor.secondaryLabelColor.withAlphaComponent(0.7)
+private let activeForegroundColor = NSColor.labelColor
+private let inactiveForegroundColor = NSColor.secondaryLabelColor.withAlphaComponent(0.7)
+
+private func activeBackgroundColor() -> CGColor {
+    NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor
+}
 
 /// `NSButton` subclass that refuses to become first responder. Without this,
 /// clicking a toolbar button shifts the window's first responder away from
@@ -147,8 +149,10 @@ private struct ToolbarIconButton: NSViewRepresentable {
         button.target = context.coordinator
         button.action = #selector(Coordinator.click)
         button.translatesAutoresizingMaskIntoConstraints = false
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 4
         NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: 28),
+            button.widthAnchor.constraint(equalToConstant: 26),
             button.heightAnchor.constraint(equalToConstant: 22)
         ])
         return button
@@ -161,7 +165,8 @@ private struct ToolbarIconButton: NSViewRepresentable {
         let symbolImage = NSImage(systemSymbolName: symbol, accessibilityDescription: tooltip)?
             .withSymbolConfiguration(config)
         button.image = symbolImage
-        button.contentTintColor = isActive ? activeColor : inactiveColor
+        button.contentTintColor = isActive ? activeForegroundColor : inactiveForegroundColor
+        button.layer?.backgroundColor = isActive ? activeBackgroundColor() : NSColor.clear.cgColor
     }
 
     func makeCoordinator() -> Coordinator {
@@ -194,8 +199,10 @@ private struct ToolbarTextButton: NSViewRepresentable {
         button.target = context.coordinator
         button.action = #selector(Coordinator.click)
         button.translatesAutoresizingMaskIntoConstraints = false
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 4
         NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: 28),
+            button.widthAnchor.constraint(equalToConstant: 26),
             button.heightAnchor.constraint(equalToConstant: 22)
         ])
         return button
@@ -206,9 +213,10 @@ private struct ToolbarTextButton: NSViewRepresentable {
         button.toolTip = tooltip
         let attrs: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
-            .foregroundColor: isActive ? activeColor : inactiveColor
+            .foregroundColor: isActive ? activeForegroundColor : inactiveForegroundColor
         ]
         button.attributedTitle = NSAttributedString(string: title, attributes: attrs)
+        button.layer?.backgroundColor = isActive ? activeBackgroundColor() : NSColor.clear.cgColor
     }
 
     func makeCoordinator() -> Coordinator {

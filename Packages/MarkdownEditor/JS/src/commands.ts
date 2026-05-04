@@ -44,6 +44,10 @@ export function applyCommand(view: EditorView, command: string, arg: string | nu
         applyLink(view);
         return;
     }
+    if (command === "codeBlock") {
+        applyCodeBlock(view);
+        return;
+    }
     const inline = inlineWraps[command];
     if (inline) {
         applyInlineWrap(view, inline);
@@ -303,6 +307,31 @@ function applyHeading(view: EditorView, level: number) {
     view.dispatch({
         changes: { from: line.from, to: line.to, insert: newText },
         selection: EditorSelection.single(sel.from + offset, sel.to + offset),
+        scrollIntoView: true,
+    });
+}
+
+// MARK: - Code block
+
+function applyCodeBlock(view: EditorView) {
+    const state = view.state;
+    const sel = state.selection.main;
+    if (sel.empty) {
+        // Empty selection: insert ```\n\n``` and park caret on the empty line.
+        const insertion = "```\n\n```";
+        view.dispatch({
+            changes: { from: sel.from, to: sel.to, insert: insertion },
+            selection: EditorSelection.single(sel.from + 4),
+            scrollIntoView: true,
+        });
+        return;
+    }
+    // Wrap the selection in a fenced code block.
+    const sliced = state.doc.sliceString(sel.from, sel.to);
+    const insertion = "```\n" + sliced + "\n```";
+    view.dispatch({
+        changes: { from: sel.from, to: sel.to, insert: insertion },
+        selection: EditorSelection.single(sel.from + 4, sel.from + 4 + sliced.length),
         scrollIntoView: true,
     });
 }

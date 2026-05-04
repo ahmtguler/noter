@@ -17,7 +17,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { applyCommand } from "./commands";
 import { detectActiveStyles } from "./detectStyles";
 import { todoBracketAutoComplete } from "./inputHandlers";
-import { livePreviewPlugin } from "./livePreview";
+import { livePreviewPlugin, taskCheckboxClickHandler } from "./livePreview";
 import { buildTheme, EditorAppearance } from "./theme";
 
 declare global {
@@ -102,6 +102,7 @@ function bootstrap() {
             // the live-preview look. The custom theme handles all colour /
             // weight rules we need.
             livePreviewPlugin,
+            taskCheckboxClickHandler,
             todoBracketAutoComplete,
             keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
             wrapCompartment.of(EditorView.lineWrapping),

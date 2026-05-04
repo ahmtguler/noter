@@ -10,6 +10,8 @@ struct PreferencesView: View {
     @AppStorage(SettingsKey.subfolder) private var subfolder = SettingsKey.defaultSubfolder
     @AppStorage(SettingsKey.idleNewNoteMinutes)
     private var idleNewNoteMinutes = SettingsKey.defaultIdleNewNoteMinutes
+    @AppStorage(SettingsKey.showFormattingToolbar)
+    private var showFormattingToolbar = SettingsKey.defaultShowFormattingToolbar
     @State private var vaultDisplay = ""
 
     private let idleHelp = """
@@ -63,6 +65,7 @@ struct PreferencesView: View {
                 Text(idleHelp)
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                Toggle("Show formatting toolbar", isOn: $showFormattingToolbar)
             }
         }
         .formStyle(.grouped)

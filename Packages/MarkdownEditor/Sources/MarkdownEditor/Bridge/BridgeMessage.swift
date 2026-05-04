@@ -75,6 +75,7 @@ enum BridgeCommand: String {
     case underline
     case strikethrough
     case code
+    case codeBlock
     case heading
     case bulletList
     case numberedList
