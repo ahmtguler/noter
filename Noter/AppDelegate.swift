@@ -6,19 +6,16 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panelController: PanelController?
     private var menuBarController: MenuBarController?
-    private var noteStore: NoteStore?
-    private var editorState: EditorState?
+    private var onboardingController: OnboardingWindowController?
+    private(set) var app: AppViewModel?
 
     func applicationDidFinishLaunching(_: Notification) {
         do {
-            let folder = try Vault.notesFolder()
-            let store = try NoteStore(folder: folder)
-            let editor = EditorState(store: store)
-            noteStore = store
-            editorState = editor
+            let viewModel = try AppViewModel()
+            app = viewModel
 
             let controller = PanelController(contentFactory: {
-                AnyView(RootView(store: store, editor: editor))
+                AnyView(RootView(app: viewModel))
             })
             panelController = controller
 
@@ -28,13 +25,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             KeyboardShortcuts.onKeyDown(for: .toggleNoter) { [weak controller] in
                 controller?.toggle()
             }
+
+            if !UserDefaults.standard.bool(forKey: SettingsKey.didOnboard) {
+                showOnboarding(app: viewModel, after: controller)
+            }
         } catch {
             presentFatalError("Failed to initialize Noter: \(error.localizedDescription)")
         }
     }
 
     func applicationWillTerminate(_: Notification) {
-        editorState?.flush()
+        app?.editor.flush()
+    }
+
+    private func showOnboarding(app: AppViewModel, after controller: PanelController) {
+        let onboarding = OnboardingWindowController(app: app) { [weak self] in
+            self?.onboardingController = nil
+            controller.show()
+        }
+        onboardingController = onboarding
+        onboarding.show()
     }
 
     private func presentFatalError(_ message: String) {

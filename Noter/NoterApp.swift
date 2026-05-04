@@ -6,7 +6,11 @@ struct NoterApp: App {
 
     var body: some Scene {
         Settings {
-            EmptyView()
+            if let app = appDelegate.app {
+                PreferencesView(app: app)
+            } else {
+                Text("Loading…").padding(40)
+            }
         }
     }
 }
