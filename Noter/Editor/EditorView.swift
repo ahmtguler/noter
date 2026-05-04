@@ -1,17 +1,22 @@
 import AppKit
 import SwiftUI
 
-/// SwiftUI wrapper around an `NSTextView` configured for plaintext-with-attributes
-/// markdown editing. The `MarkdownStyler` re-applies attributes on every edit.
+/// SwiftUI wrapper around `MarkdownTextView` configured for plaintext-with-attributes
+/// markdown editing. The `MarkdownStyler` re-applies attributes on every edit;
+/// keyboard shortcuts and toolbar buttons go through `EditorCommands`.
 struct EditorView: NSViewRepresentable {
     @Binding var text: String
+    let commands: EditorCommands
 
     func makeNSView(context: Context) -> NSScrollView {
-        let scrollView = NSTextView.scrollableTextView()
-        guard let textView = scrollView.documentView as? NSTextView else {
-            fatalError("scrollableTextView did not produce an NSTextView")
-        }
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = true
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.autoresizingMask = [.width, .height]
 
+        let textView = MarkdownTextView(frame: .zero)
+        textView.commands = commands
         textView.delegate = context.coordinator
         textView.allowsUndo = true
         textView.isAutomaticQuoteSubstitutionEnabled = false
@@ -26,24 +31,39 @@ struct EditorView: NSViewRepresentable {
         textView.textContainerInset = NSSize(width: 24, height: 16)
         textView.smartInsertDeleteEnabled = false
         textView.usesFontPanel = false
+        textView.drawsBackground = false
+        textView.backgroundColor = .clear
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.minSize = NSSize(width: 0, height: 0)
+        textView.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.containerSize = NSSize(
+            width: scrollView.contentSize.width,
+            height: CGFloat.greatestFiniteMagnitude
+        )
 
         let styler = MarkdownStyler()
         textView.textStorage?.delegate = styler
         context.coordinator.styler = styler
-
         textView.string = text
         if let storage = textView.textStorage {
             styler.restyleAll(storage)
         }
         context.coordinator.textView = textView
+        commands.textView = textView
 
+        scrollView.documentView = textView
         return scrollView
     }
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         if textView.string != text {
-            // External update — keep selection if it still fits, otherwise clamp.
             let oldSelection = textView.selectedRange()
             textView.string = text
             let length = (textView.string as NSString).length

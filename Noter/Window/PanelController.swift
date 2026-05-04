@@ -35,19 +35,22 @@ final class PanelController: NSObject {
     }
 
     func show() {
+        NSLog("[Noter] PanelController.show begin (visible=\(panel?.isVisible == true))")
         onWillShow?()
         let panel = ensurePanel()
         restoreFrame(into: panel)
         suppressHideUntil = Date().addingTimeInterval(suppressHideWindow)
-        // LSUIElement apps don't auto-activate; without this the panel can
-        // appear and immediately receive a spurious resignKey. orderFrontRegardless
-        // forces the panel visible even if the app isn't quite considered active yet.
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
         panel.makeKey()
+        NSLog(
+            "[Noter] PanelController.show end frame=\(NSStringFromRect(panel.frame)) " +
+                "visible=\(panel.isVisible) screens=\(NSScreen.screens.count)"
+        )
     }
 
     func hide() {
+        NSLog("[Noter] PanelController.hide")
         lastHiddenAt = Date()
         panel?.orderOut(nil)
     }
@@ -60,9 +63,13 @@ final class PanelController: NSObject {
         if let panel {
             return panel
         }
+        NSLog("[Noter] PanelController creating popup window")
         let panel = PopupPanel()
         panel.delegate = self
-        panel.contentView = NSHostingView(rootView: contentFactory())
+        let host = NSHostingView(rootView: contentFactory())
+        host.frame = panel.contentView?.bounds ?? .zero
+        host.autoresizingMask = [.width, .height]
+        panel.contentView = host
         self.panel = panel
         return panel
     }
@@ -105,8 +112,10 @@ extension PanelController: NSWindowDelegate {
     }
 
     func windowDidResignKey(_: Notification) {
+        NSLog("[Noter] windowDidResignKey pinned=\(defaults.bool(forKey: SettingsKey.pinned))")
         guard !defaults.bool(forKey: SettingsKey.pinned) else { return }
         if let suppressUntil = suppressHideUntil, Date() < suppressUntil {
+            NSLog("[Noter] suppressing hide for \(suppressUntil.timeIntervalSinceNow)s")
             return
         }
         hide()

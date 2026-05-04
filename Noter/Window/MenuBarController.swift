@@ -38,6 +38,7 @@ final class MenuBarController: NSObject {
     private func handleClick(_: Any?) {
         let event = NSApp.currentEvent
         let modifiers = event?.modifierFlags ?? []
+        NSLog("[Noter] menu bar click type=\(event?.type.rawValue.description ?? "nil")")
         if event?.type == .rightMouseUp || modifiers.contains(.control) {
             showContextMenu()
         } else {
