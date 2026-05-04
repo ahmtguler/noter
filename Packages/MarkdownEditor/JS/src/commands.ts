@@ -1,15 +1,17 @@
-// Translates the Swift bridge command names into edits on the CodeMirror state.
-// Each command operates on the current selection (or current line for line-prefix
-// commands) and tries to toggle off when applied a second time.
+// Translates Swift bridge commands into CodeMirror state edits. Each command
+// works with or without a selection: empty-selection actions either insert
+// markers around the caret or toggle the current line's prefix; range actions
+// wrap or toggle every covered line.
 
 import { EditorView } from "@codemirror/view";
-import { EditorSelection, Transaction, ChangeSpec } from "@codemirror/state";
+import { EditorSelection, ChangeSpec } from "@codemirror/state";
 
 interface InlineWrap {
     prefix: string;
     suffix: string;
-    /// Single-character markers (e.g. `*`) refuse to match the inner edge of
-    /// doubled markers (e.g. `**`) so they stack rather than unwrap.
+    /// Single-character markers (`*`, `_`) refuse to false-match the inner
+    /// edge of doubled markers (`**`, `__`) so styles stack instead of
+    /// unwrapping each other.
     singleCharMarker?: boolean;
 }
 
@@ -62,7 +64,7 @@ function applyInlineWrap(view: EditorView, wrap: InlineWrap) {
     const doc = state.doc;
     const sliced = doc.sliceString(range.from, range.to);
 
-    // 1) Selection covers wrap markers themselves — strip them.
+    // Selection covers wrap markers themselves — strip them.
     if (
         sliced.length >= prefix.length + suffix.length &&
         sliced.startsWith(prefix) &&
@@ -77,7 +79,7 @@ function applyInlineWrap(view: EditorView, wrap: InlineWrap) {
         return;
     }
 
-    // 2) Selection is wrapped by surrounding markers — strip them.
+    // Selection wrapped by surrounding markers — strip them.
     const outsideStart = range.from - prefix.length;
     const outsideEnd = range.to + suffix.length;
     if (outsideStart >= 0 && outsideEnd <= doc.length) {
@@ -97,14 +99,17 @@ function applyInlineWrap(view: EditorView, wrap: InlineWrap) {
         }
     }
 
-    // 3) Empty selection inside an existing wrap — unwrap (caret moves to start).
+    // Empty selection inside an existing wrap — unwrap.
     if (range.empty) {
-        const surrounding = findEnclosingWrap(doc.toString(), range.from, prefix, suffix, !!singleCharMarker);
+        const surrounding = findEnclosingWrap(
+            doc.toString(),
+            range.from,
+            prefix,
+            suffix,
+            !!singleCharMarker
+        );
         if (surrounding) {
-            const inner = doc.sliceString(
-                surrounding.openEnd,
-                surrounding.closeStart,
-            );
+            const inner = doc.sliceString(surrounding.openEnd, surrounding.closeStart);
             view.dispatch({
                 changes: {
                     from: surrounding.openStart,
@@ -116,7 +121,7 @@ function applyInlineWrap(view: EditorView, wrap: InlineWrap) {
             });
             return;
         }
-        // No surrounding wrap: insert markers, place caret between.
+        // No surrounding wrap: insert markers, place caret between them.
         view.dispatch({
             changes: { from: range.from, to: range.to, insert: prefix + suffix },
             selection: EditorSelection.single(range.from + prefix.length),
@@ -125,11 +130,14 @@ function applyInlineWrap(view: EditorView, wrap: InlineWrap) {
         return;
     }
 
-    // 4) Default: wrap selection.
+    // Default: wrap selection.
     const insert = prefix + sliced + suffix;
     view.dispatch({
         changes: { from: range.from, to: range.to, insert },
-        selection: EditorSelection.single(range.from + prefix.length, range.from + prefix.length + sliced.length),
+        selection: EditorSelection.single(
+            range.from + prefix.length,
+            range.from + prefix.length + sliced.length
+        ),
         scrollIntoView: true,
     });
 }
@@ -139,7 +147,7 @@ function abutsDoubledMarker(
     outsideStart: number,
     outsideEnd: number,
     marker: string,
-    singleChar: boolean,
+    singleChar: boolean
 ): boolean {
     if (!singleChar) return false;
     const before = outsideStart > 0 ? doc.sliceString(outsideStart - 1, outsideStart) : "";
@@ -152,7 +160,7 @@ function findEnclosingWrap(
     position: number,
     prefix: string,
     suffix: string,
-    singleChar: boolean,
+    singleChar: boolean
 ): { openStart: number; openEnd: number; closeStart: number; closeEnd: number } | null {
     const lineStart = fullText.lastIndexOf("\n", position - 1) + 1;
     const lineEnd = (() => {
@@ -172,9 +180,7 @@ function findEnclosingWrap(
             if (singleChar) {
                 const before = start > 0 ? line[start - 1] : "";
                 const after = end < line.length ? line[end] : "";
-                if (before === prefix || after === prefix) {
-                    continue;
-                }
+                if (before === prefix || after === prefix) continue;
             }
             return {
                 openStart: lineStart + start,
@@ -199,42 +205,78 @@ function toggleLinePrefix(view: EditorView, prefix: string) {
     const startLine = state.doc.lineAt(sel.from);
     const endLine = state.doc.lineAt(sel.to);
 
-    const lines: { from: number; to: number; text: string }[] = [];
+    type LineInfo = { from: number; to: number; text: string; number: number };
+    const lines: LineInfo[] = [];
     for (let n = startLine.number; n <= endLine.number; n++) {
         const line = state.doc.line(n);
-        lines.push({ from: line.from, to: line.to, text: line.text });
+        lines.push({ from: line.from, to: line.to, text: line.text, number: n });
     }
 
-    const isAnyBlockMarker = (line: string) => /^(#{1,6}\s|>\s|-\s\[[xX ]\]\s|[-*+]\s|\d+\.\s)/.test(line);
-    const allHavePrefix = lines.every(({ text }) => text.length === 0 || text.startsWith(prefix));
+    const linesWithText = lines.filter((l) => l.text.length > 0);
+    const allHavePrefix =
+        linesWithText.length > 0 && linesWithText.every((l) => l.text.startsWith(prefix));
 
-    let cumulativeOffset = 0;
     const changes: ChangeSpec[] = [];
+    let cursorLineNewEnd = sel.head;
+    const cursorLineNumber = state.doc.lineAt(sel.head).number;
+    let runningOffset = 0;
 
     for (const line of lines) {
-        if (line.text.length === 0) continue;
-
         let newText: string;
         if (allHavePrefix) {
-            newText = line.text.slice(prefix.length);
+            // Removing prefix; empty lines stay empty.
+            newText = line.text.length === 0 ? "" : line.text.slice(prefix.length);
+        } else if (line.text.length === 0) {
+            // Empty line: just add the prefix so the caret can start typing.
+            newText = prefix;
         } else {
-            // Strip any other block marker first so toggles between styles replace cleanly.
             const stripped = stripAnyBlockMarker(line.text);
             newText = stripped.startsWith(prefix) ? stripped : prefix + stripped;
         }
 
-        changes.push({ from: line.from, to: line.to, insert: newText });
-        cumulativeOffset += newText.length - line.text.length;
-        void isAnyBlockMarker;
+        if (newText !== line.text) {
+            changes.push({ from: line.from, to: line.to, insert: newText });
+        }
+
+        const lineDelta = newText.length - line.text.length;
+        const lineNewEnd = line.from + runningOffset + newText.length;
+        runningOffset += lineDelta;
+
+        if (line.number === cursorLineNumber) {
+            cursorLineNewEnd = lineNewEnd;
+        }
     }
 
     if (changes.length === 0) return;
 
-    view.dispatch({
-        changes,
-        selection: EditorSelection.single(sel.from, sel.to + cumulativeOffset),
-        scrollIntoView: true,
-    });
+    if (sel.from === sel.to) {
+        // Empty selection: park the caret at the end of the (rewritten) cursor line.
+        view.dispatch({
+            changes,
+            selection: EditorSelection.single(cursorLineNewEnd),
+            scrollIntoView: true,
+        });
+    } else {
+        // Multi-line range: re-select the rewritten block.
+        const blockStart = lines[0].from;
+        const blockNewLen =
+            lines.reduce((sum, l, idx) => {
+                const newLineText: string = (() => {
+                    if (allHavePrefix) {
+                        return l.text.length === 0 ? "" : l.text.slice(prefix.length);
+                    }
+                    if (l.text.length === 0) return prefix;
+                    const stripped = stripAnyBlockMarker(l.text);
+                    return stripped.startsWith(prefix) ? stripped : prefix + stripped;
+                })();
+                return sum + newLineText.length + (idx < lines.length - 1 ? 1 : 0);
+            }, 0);
+        view.dispatch({
+            changes,
+            selection: EditorSelection.single(blockStart, blockStart + blockNewLen),
+            scrollIntoView: true,
+        });
+    }
 }
 
 function stripAnyBlockMarker(line: string): string {

@@ -3,10 +3,15 @@
 // underlying document, so the file on disk is plain markdown — only the
 // presentation changes.
 //
-// Reveal-on-cursor (the Obsidian behaviour where markers reappear on the line
-// you're editing) is intentionally NOT enabled — it confuses caret movement
-// and makes selection ranges harder to reason about. Editing happens via the
-// toolbar / keyboard shortcuts; markers stay invisible.
+// Special-cases:
+// - HeaderMark only hides once the heading actually has content. Typing `#`
+//   alone leaves the # visible so the user can see what they're doing.
+// - When hiding a HeaderMark we also swallow the trailing space so the
+//   rendered heading text starts at the line's left edge instead of being
+//   indented by the orphaned space.
+// - ListMark for unordered lists (`-`, `*`, `+`) is replaced with `•`.
+//   Numbered list digits and TaskMarker brackets stay visible — the user
+//   needs them as visual context.
 
 import {
     Decoration,
@@ -20,15 +25,12 @@ import { syntaxTree } from "@codemirror/language";
 import { RangeSetBuilder } from "@codemirror/state";
 
 const HIDDEN_MARKERS = new Set([
-    "HeaderMark",         // # ## ### …
-    "EmphasisMark",       // * or _ (italic) and ** or __ (bold)
-    "CodeMark",           // ` (inline code)
-    "StrikethroughMark",  // ~~
-    "LinkMark",           // [ ] ( ) and the leading ! for images
-    "URL",                // the url part of a link or image
-    "QuoteMark",          // > (blockquote)
-    // ListMark is replaced with a bullet widget below.
-    // TaskMarker stays visible — checkbox is the affordance.
+    "EmphasisMark",
+    "CodeMark",
+    "StrikethroughMark",
+    "LinkMark",
+    "URL",
+    "QuoteMark",
 ]);
 
 class BulletWidget extends WidgetType {
@@ -61,9 +63,6 @@ export const livePreviewPlugin = ViewPlugin.fromClass(
         }
 
         update(update: ViewUpdate): void {
-            // Only recompute when the document or visible viewport actually
-            // changes — selection moves no longer affect what we render
-            // because we always hide markers regardless of cursor position.
             if (update.docChanged || update.viewportChanged) {
                 this.decorations = compute(update.view);
             }
@@ -77,7 +76,6 @@ export const livePreviewPlugin = ViewPlugin.fromClass(
 function compute(view: EditorView): DecorationSet {
     const builder = new RangeSetBuilder<Decoration>();
     const tree = syntaxTree(view.state);
-    const processedLists = new Set<number>();
 
     for (const { from, to } of view.visibleRanges) {
         tree.iterate({
@@ -86,21 +84,31 @@ function compute(view: EditorView): DecorationSet {
             enter(node) {
                 const name = node.type.name;
 
+                if (name === "HeaderMark") {
+                    const line = view.state.doc.lineAt(node.from);
+                    // Only hide once the heading has actual non-whitespace content
+                    // after the marker. Otherwise the user can't see what they're
+                    // typing while building a heading.
+                    if (!/^#{1,6}\s+\S/.test(line.text)) return;
+                    let hideTo = node.to;
+                    const next = view.state.sliceDoc(node.to, node.to + 1);
+                    if (next === " ") hideTo += 1;
+                    builder.add(node.from, hideTo, Decoration.replace({}));
+                    return;
+                }
+
                 if (HIDDEN_MARKERS.has(name)) {
                     builder.add(node.from, node.to, Decoration.replace({}));
                     return;
                 }
 
-                if (name === "ListMark" && !processedLists.has(node.from)) {
-                    processedLists.add(node.from);
+                if (name === "ListMark") {
                     const text = view.state.sliceDoc(node.from, node.to);
                     if (text === "-" || text === "*" || text === "+") {
                         builder.add(
                             node.from,
                             node.to,
-                            Decoration.replace({
-                                widget: new BulletWidget("•"),
-                            })
+                            Decoration.replace({ widget: new BulletWidget("•") })
                         );
                     }
                 }

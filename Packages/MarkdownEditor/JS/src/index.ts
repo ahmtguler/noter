@@ -9,19 +9,14 @@ import {
     rectangularSelection,
     crosshairCursor,
     highlightActiveLine,
-    lineNumbers,
 } from "@codemirror/view";
-import {
-    defaultHighlightStyle,
-    syntaxHighlighting,
-    indentOnInput,
-    bracketMatching,
-} from "@codemirror/language";
+import { indentOnInput, bracketMatching } from "@codemirror/language";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 
 import { applyCommand } from "./commands";
 import { detectActiveStyles } from "./detectStyles";
+import { todoBracketAutoComplete } from "./inputHandlers";
 import { livePreviewPlugin } from "./livePreview";
 import { buildTheme, EditorAppearance } from "./theme";
 
@@ -103,8 +98,11 @@ function bootstrap() {
             indentOnInput(),
             bracketMatching(),
             markdown({ base: markdownLanguage, codeLanguages: [], addKeymap: true }),
-            syntaxHighlighting(defaultHighlightStyle),
+            // No defaultHighlightStyle — its heading underline doesn't fit
+            // the live-preview look. The custom theme handles all colour /
+            // weight rules we need.
             livePreviewPlugin,
+            todoBracketAutoComplete,
             keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
             wrapCompartment.of(EditorView.lineWrapping),
             themeCompartment.of(buildTheme(initialAppearance)),
@@ -144,7 +142,6 @@ function bootstrap() {
                         EditorView.theme({
                             "&": {
                                 fontSize: `${config.fontSize}px`,
-                                padding: `12px ${config.contentPadding}px`,
                             },
                         })
                     ),
