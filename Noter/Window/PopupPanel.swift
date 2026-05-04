@@ -23,6 +23,9 @@ final class PopupPanel: NSWindow {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = true
+        // Hide all traffic-light buttons — the SwiftUI title bar provides its
+        // own close affordance and clicking outside also hides the popup.
+        standardWindowButton(.closeButton)?.isHidden = true
         standardWindowButton(.miniaturizeButton)?.isHidden = true
         standardWindowButton(.zoomButton)?.isHidden = true
     }

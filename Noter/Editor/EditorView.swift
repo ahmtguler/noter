@@ -93,6 +93,12 @@ struct EditorView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
             text = textView.string
+            (textView as? MarkdownTextView)?.commands?.recomputeActiveStyles()
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            (textView as? MarkdownTextView)?.commands?.recomputeActiveStyles()
         }
     }
 }

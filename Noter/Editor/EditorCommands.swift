@@ -1,25 +1,39 @@
 import AppKit
+import Combine
 import Foundation
 
 /// Bridge between toolbar / keyboard shortcuts and the underlying NSTextView.
 /// All actions operate on the current selection (or the cursor line for line-prefix
 /// commands), exactly like every other markdown editor.
+///
+/// Also publishes `activeStyles` derived from the current selection so the
+/// toolbar can highlight the buttons whose style is in effect at the caret.
 @MainActor
 final class EditorCommands: ObservableObject {
+    enum Style: Hashable {
+        case heading(Int)
+        case bold
+        case italic
+        case underline
+        case strikethrough
+        case code
+        case bulletList
+        case numberedList
+        case todoList
+        case quote
+    }
+
     weak var textView: NSTextView?
+    @Published private(set) var activeStyles: Set<Style> = []
 
     // MARK: - Inline wrap (bold/italic/code/strikethrough/underline)
 
-    /// Wrap the current selection with `prefix`/`suffix`. If the selection is
-    /// already wrapped, unwrap it. If selection is empty, insert markers and
-    /// place the caret between them.
     func wrap(prefix: String, suffix: String? = nil) {
         guard let textView else { return }
         let suffix = suffix ?? prefix
         let nsString = textView.string as NSString
         let selectedRange = textView.selectedRange()
 
-        // Try to detect already-wrapped selection so the second tap toggles off.
         let prefixLen = (prefix as NSString).length
         let suffixLen = (suffix as NSString).length
         let surroundingStart = selectedRange.location - prefixLen
@@ -58,8 +72,6 @@ final class EditorCommands: ObservableObject {
 
     // MARK: - Line-prefix (heading / list / quote / todo)
 
-    /// Toggle a line prefix on every line of the selection. If all lines already
-    /// have the prefix, remove it; otherwise add it to lines that lack it.
     func toggleLinePrefix(_ prefix: String) {
         guard let textView else { return }
         let nsString = textView.string as NSString
@@ -79,7 +91,6 @@ final class EditorCommands: ObservableObject {
                 }
                 return line
             }
-            // Replace any existing heading prefix (#, ##, …) before adding ours.
             let withoutHeading = stripHeadingPrefix(line)
             if withoutHeading.hasPrefix(prefix) { return withoutHeading }
             return prefix + withoutHeading
@@ -89,8 +100,6 @@ final class EditorCommands: ObservableObject {
         replace(in: lineRange, with: newBlock, restoreSelection: newSelection)
     }
 
-    /// Specialised heading toggle: cycles "" → "# " → "## " → … "###### " → "" if the
-    /// same level is requested twice. Replaces any existing heading level.
     func setHeading(level: Int) {
         guard let textView else { return }
         precondition((1 ... 6).contains(level))
@@ -119,9 +128,6 @@ final class EditorCommands: ObservableObject {
 
     // MARK: - Snippet insertion (link, todo)
 
-    /// Insert a snippet at the caret. `cursorOffset` places the caret relative
-    /// to the start of the inserted text (e.g. `[]()` → cursor offset 1 puts it
-    /// inside the square brackets).
     func insertSnippet(_ snippet: String, cursorOffset: Int) {
         guard let textView else { return }
         let selectedRange = textView.selectedRange()
@@ -135,7 +141,7 @@ final class EditorCommands: ObservableObject {
         let selectedRange = textView.selectedRange()
         let selectedText = nsString.substring(with: selectedRange)
         if selectedText.isEmpty {
-            insertSnippet("[]()", cursorOffset: 1) // caret inside the brackets
+            insertSnippet("[]()", cursorOffset: 1)
         } else {
             let replacement = "[\(selectedText)]()"
             let cursor = NSRange(
@@ -150,6 +156,65 @@ final class EditorCommands: ObservableObject {
         toggleLinePrefix("- [ ] ")
     }
 
+    // MARK: - Active style detection
+
+    /// Recompute which styles apply to the current caret/selection. Toolbar
+    /// observes this to highlight the matching buttons.
+    func recomputeActiveStyles() {
+        guard let textView else {
+            activeStyles = []
+            return
+        }
+        let nsString = textView.string as NSString
+        let selectedRange = textView.selectedRange()
+        let lineRange = nsString.lineRange(for: selectedRange)
+        let line = nsString.substring(with: lineRange)
+        let lineRelativeStart = selectedRange.location - lineRange.location
+        let lineRelativeEnd = lineRelativeStart + selectedRange.length
+
+        var styles: Set<Style> = []
+
+        if let level = headingLevel(in: line) {
+            styles.insert(.heading(level))
+        }
+        let isTodo = matchesPrefix(in: line, prefix: "- [ ] ")
+            || matchesPrefix(in: line, prefix: "- [x] ")
+            || matchesPrefix(in: line, prefix: "- [X] ")
+        if isTodo {
+            styles.insert(.todoList)
+        } else if line.range(of: #"^\s*[-*+]\s+"#, options: .regularExpression) != nil {
+            styles.insert(.bulletList)
+        }
+        if line.range(of: #"^\s*\d+\.\s+"#, options: .regularExpression) != nil {
+            styles.insert(.numberedList)
+        }
+        if matchesPrefix(in: line, prefix: "> ") {
+            styles.insert(.quote)
+        }
+        if isInsideInline(pattern: #"\*\*([^*\n]+)\*\*"#, line: line, start: lineRelativeStart, end: lineRelativeEnd) {
+            styles.insert(.bold)
+        }
+        if isInsideInline(
+            pattern: #"(?<!\*)\*([^*\n]+)\*(?!\*)"#,
+            line: line,
+            start: lineRelativeStart,
+            end: lineRelativeEnd
+        ) {
+            styles.insert(.italic)
+        }
+        if isInsideInline(pattern: #"~~([^~\n]+)~~"#, line: line, start: lineRelativeStart, end: lineRelativeEnd) {
+            styles.insert(.strikethrough)
+        }
+        if isInsideInline(pattern: #"<u>([^<\n]+)</u>"#, line: line, start: lineRelativeStart, end: lineRelativeEnd) {
+            styles.insert(.underline)
+        }
+        if isInsideInline(pattern: #"`([^`\n]+)`"#, line: line, start: lineRelativeStart, end: lineRelativeEnd) {
+            styles.insert(.code)
+        }
+
+        activeStyles = styles
+    }
+
     // MARK: - Helpers
 
     private func replace(in range: NSRange, with replacement: String, restoreSelection: NSRange) {
@@ -158,21 +223,43 @@ final class EditorCommands: ObservableObject {
         textView.textStorage?.replaceCharacters(in: range, with: replacement)
         textView.didChangeText()
         textView.setSelectedRange(restoreSelection)
+        recomputeActiveStyles()
     }
 
     private func stripHeadingPrefix(_ line: String) -> String {
-        line.replacingOccurrences(
-            of: #"^#{1,6}\s+"#,
-            with: "",
-            options: .regularExpression
-        )
+        line.replacingOccurrences(of: #"^#{1,6}\s+"#, with: "", options: .regularExpression)
     }
 
     private func stripHeadingHashes(_ line: String) -> String {
-        line.replacingOccurrences(
-            of: #"^#{1,6}\s*"#,
-            with: "",
-            options: .regularExpression
-        )
+        line.replacingOccurrences(of: #"^#{1,6}\s*"#, with: "", options: .regularExpression)
+    }
+
+    private func headingLevel(in line: String) -> Int? {
+        guard let regex = try? NSRegularExpression(pattern: #"^(#{1,6})\s+"#) else { return nil }
+        let nsLine = line as NSString
+        guard let match = regex.firstMatch(in: line, range: NSRange(location: 0, length: nsLine.length)) else {
+            return nil
+        }
+        return match.range(at: 1).length
+    }
+
+    private func matchesPrefix(in line: String, prefix: String) -> Bool {
+        line.hasPrefix(prefix)
+    }
+
+    private func isInsideInline(pattern: String, line: String, start: Int, end: Int) -> Bool {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return false }
+        let nsLine = line as NSString
+        var inside = false
+        regex.enumerateMatches(in: line, range: NSRange(location: 0, length: nsLine.length)) { match, _, stop in
+            guard let match else { return }
+            let lower = match.range.location
+            let upper = match.range.location + match.range.length
+            if lower <= start, upper >= end {
+                inside = true
+                stop.pointee = true
+            }
+        }
+        return inside
     }
 }

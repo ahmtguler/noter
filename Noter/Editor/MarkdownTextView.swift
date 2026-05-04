@@ -23,7 +23,7 @@ final class MarkdownTextView: NSTextView {
         if modifiers == [.command, .shift] {
             return handleCommandShift(key: key, commands: commands)
         }
-        if modifiers == [.command, .option], let digit = Int(key), (1 ... 6).contains(digit) {
+        if modifiers == [.command, .option], let digit = Int(key), (1 ... 3).contains(digit) {
             commands.setHeading(level: digit)
             return true
         }
