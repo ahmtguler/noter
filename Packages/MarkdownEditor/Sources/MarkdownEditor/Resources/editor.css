@@ -1,0 +1,44 @@
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: transparent;
+    color-scheme: light dark;
+    -webkit-user-select: text;
+    user-select: text;
+    overflow: hidden;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+}
+
+#editor-root {
+    height: 100%;
+    width: 100%;
+}
+
+#editor-root .cm-editor {
+    height: 100%;
+    background: transparent;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(127, 127, 127, 0.4);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(127, 127, 127, 0.6);
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}

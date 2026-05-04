@@ -21,6 +21,8 @@ packages:
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: "2.2.1"
+  MarkdownEditor:
+    path: Packages/MarkdownEditor
 
 targets:
   Noter:
@@ -54,6 +56,7 @@ targets:
         ENABLE_PREVIEWS: YES
     dependencies:
       - package: KeyboardShortcuts
+      - package: MarkdownEditor
 
   NoterTests:
     type: bundle.unit-test
