@@ -81,4 +81,10 @@ extension PanelController: NSWindowDelegate {
     func windowWillClose(_: Notification) {
         persistFrame()
     }
+
+    func windowDidResignKey(_: Notification) {
+        // Hide on focus loss unless the user has pinned the panel.
+        guard !defaults.bool(forKey: SettingsKey.pinned) else { return }
+        panel?.orderOut(nil)
+    }
 }
