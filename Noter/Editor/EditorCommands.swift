@@ -45,7 +45,20 @@ final class EditorCommands: ObservableObject {
                 location: selectedRange.location + selectedRange.length,
                 length: suffixLen
             ))
-            return leading == prefix && trailing == suffix
+            guard leading == prefix, trailing == suffix else { return false }
+            // Single-character markers (* or _) shouldn't match the inner side
+            // of a doubled marker (** or __). Otherwise italicizing inside bold
+            // would unwrap the bold instead of stacking the italic.
+            if prefix.count == 1, prefix == suffix {
+                let beforeChar = surroundingStart > 0
+                    ? nsString.substring(with: NSRange(location: surroundingStart - 1, length: 1))
+                    : ""
+                let afterChar = surroundingEnd < nsString.length
+                    ? nsString.substring(with: NSRange(location: surroundingEnd, length: 1))
+                    : ""
+                if beforeChar == prefix || afterChar == prefix { return false }
+            }
+            return true
         }()
 
         if alreadyWrapped {
