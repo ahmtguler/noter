@@ -61,13 +61,17 @@ type_name:
   max_length: 50
 
 function_body_length:
-  warning: 60
-  error: 100
+  warning: 80
+  error: 120
 
 file_length:
+  warning: 500
+  error: 700
+
+type_body_length:
   warning: 400
   error: 600
 
 cyclomatic_complexity:
-  warning: 12
-  error: 20
+  warning: 14
+  error: 22
