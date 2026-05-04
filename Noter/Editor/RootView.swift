@@ -31,15 +31,17 @@ struct RootView: View {
             }
 
             if showSwitcher {
-                Color.black.opacity(0.001)
-                    .contentShape(Rectangle())
-                    .onTapGesture { showSwitcher = false }
-                SwitcherOverlay(
-                    store: app.store,
-                    editor: app.editor,
-                    isShowing: $showSwitcher
-                )
-                .padding(.top, 60)
+                ZStack {
+                    Color.black.opacity(0.001)
+                        .contentShape(Rectangle())
+                        .onTapGesture { showSwitcher = false }
+                    SwitcherOverlay(
+                        store: app.store,
+                        editor: app.editor,
+                        isShowing: $showSwitcher
+                    )
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .background(
@@ -50,6 +52,15 @@ struct RootView: View {
         .ignoresSafeArea()
         .frame(minWidth: 380, minHeight: 360)
         .onAppear { ensureAnOpenNote() }
+        .onReceive(NotificationCenter.default.publisher(for: .noterShowSwitcher)) { _ in
+            showSwitcher = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .noterNewNote)) { _ in
+            createAndOpenNewNote()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .noterShowPreferences)) { _ in
+            PreferencesAction.open()
+        }
     }
 
     private var editorConfiguration: EditorConfiguration {
@@ -125,18 +136,12 @@ struct RootView: View {
     }
 
     private var hiddenShortcuts: some View {
-        ZStack {
-            Button("Open switcher") { showSwitcher = true }
-                .keyboardShortcut("p", modifiers: .command)
-            Button("New note") { createAndOpenNewNote() }
-                .keyboardShortcut("n", modifiers: .command)
-            Button("Preferences") { PreferencesAction.open() }
-                .keyboardShortcut(",", modifiers: .command)
-        }
-        .buttonStyle(.plain)
-        .opacity(0)
-        .frame(width: 0, height: 0)
-        .accessibilityHidden(true)
+        // ⌘N / ⌘P / ⌘, are intercepted by `PanelKeyMonitor` (a local
+        // NSEvent monitor) before they can reach the WKWebView, then
+        // delivered as notifications observed by this view. The hidden
+        // SwiftUI shortcut buttons aren't enough on their own because the
+        // web view's content will swallow the event first.
+        EmptyView()
     }
 
     private func ensureAnOpenNote() {

@@ -7,6 +7,7 @@ final class PanelController: NSObject {
     typealias ContentFactory = () -> AnyView
 
     private var panel: PopupPanel?
+    private var keyMonitor: PanelKeyMonitor?
     private let defaults: UserDefaults
     private let contentFactory: ContentFactory
     private(set) var lastHiddenAt: Date?
@@ -35,7 +36,6 @@ final class PanelController: NSObject {
     }
 
     func show() {
-        NSLog("[Noter] PanelController.show begin (visible=\(panel?.isVisible == true))")
         onWillShow?()
         let panel = ensurePanel()
         restoreFrame(into: panel)
@@ -43,15 +43,12 @@ final class PanelController: NSObject {
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
         panel.makeKey()
-        NSLog(
-            "[Noter] PanelController.show end frame=\(NSStringFromRect(panel.frame)) " +
-                "visible=\(panel.isVisible) screens=\(NSScreen.screens.count)"
-        )
+        keyMonitor?.install()
     }
 
     func hide() {
-        NSLog("[Noter] PanelController.hide")
         lastHiddenAt = Date()
+        keyMonitor?.uninstall()
         panel?.orderOut(nil)
     }
 
@@ -63,7 +60,6 @@ final class PanelController: NSObject {
         if let panel {
             return panel
         }
-        NSLog("[Noter] PanelController creating popup window")
         let panel = PopupPanel()
         panel.delegate = self
         let host = NSHostingView(rootView: contentFactory())
@@ -71,6 +67,7 @@ final class PanelController: NSObject {
         host.autoresizingMask = [.width, .height]
         panel.contentView = host
         self.panel = panel
+        keyMonitor = PanelKeyMonitor(panel: panel)
         return panel
     }
 
@@ -112,10 +109,8 @@ extension PanelController: NSWindowDelegate {
     }
 
     func windowDidResignKey(_: Notification) {
-        NSLog("[Noter] windowDidResignKey pinned=\(defaults.bool(forKey: SettingsKey.pinned))")
         guard !defaults.bool(forKey: SettingsKey.pinned) else { return }
         if let suppressUntil = suppressHideUntil, Date() < suppressUntil {
-            NSLog("[Noter] suppressing hide for \(suppressUntil.timeIntervalSinceNow)s")
             return
         }
         hide()
