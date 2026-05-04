@@ -17,6 +17,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let controller = PanelController(contentFactory: {
                 AnyView(RootView(app: viewModel))
             })
+            controller.onWillShow = { [weak controller] in
+                guard let controller else { return }
+                let minutes = UserDefaults.standard.object(forKey: SettingsKey.idleNewNoteMinutes) as? Int
+                    ?? SettingsKey.defaultIdleNewNoteMinutes
+                guard minutes > 0,
+                      let lastHiddenAt = controller.lastHiddenAt,
+                      Date().timeIntervalSince(lastHiddenAt) > Double(minutes) * 60
+                else { return }
+                viewModel.editor.startBlankDraft()
+            }
             panelController = controller
 
             menuBarController = MenuBarController { [weak controller] in
