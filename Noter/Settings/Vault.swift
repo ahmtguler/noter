@@ -1,12 +1,19 @@
 import Foundation
 
-/// Resolves the on-disk folder for notes. Until onboarding lands, falls back to
-/// the sandboxed app's Application Support directory so the app is usable for
-/// development without configuring a vault.
+/// Resolves the on-disk folder for notes. Prefers the user-chosen vault (via
+/// security-scoped bookmark) and falls back to the sandboxed app's Application
+/// Support directory if no vault is configured yet.
 enum Vault {
     static func notesFolder(defaults: UserDefaults = .standard) throws -> URL {
-        let subfolder = defaults.string(forKey: SettingsKey.subfolder) ?? SettingsKey.defaultSubfolder
-        // TODO: resolve vault security-scoped bookmark in the onboarding commit.
+        let raw = defaults.string(forKey: SettingsKey.subfolder) ?? ""
+        let subfolder = raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? SettingsKey.defaultSubfolder
+            : raw
+        if let vault = VaultBookmark.resolve(from: defaults) {
+            let folder = vault.appendingPathComponent(subfolder, isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            return folder
+        }
         let support = try FileManager.default.url(
             for: .applicationSupportDirectory,
             in: .userDomainMask,
