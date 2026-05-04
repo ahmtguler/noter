@@ -1,6 +1,12 @@
-// Live-preview ViewPlugin that hides markdown marker characters in lines the
-// caret isn't on (the same UX Obsidian's Live Preview / Bear use). Markers
-// reappear on the active line so the user can edit them.
+// Live-preview ViewPlugin that hides markdown marker characters at all times,
+// substituting bullets and showing only the rendered text. Markers stay in the
+// underlying document, so the file on disk is plain markdown — only the
+// presentation changes.
+//
+// Reveal-on-cursor (the Obsidian behaviour where markers reappear on the line
+// you're editing) is intentionally NOT enabled — it confuses caret movement
+// and makes selection ranges harder to reason about. Editing happens via the
+// toolbar / keyboard shortcuts; markers stay invisible.
 
 import {
     Decoration,
@@ -14,15 +20,15 @@ import { syntaxTree } from "@codemirror/language";
 import { RangeSetBuilder } from "@codemirror/state";
 
 const HIDDEN_MARKERS = new Set([
-    "HeaderMark",     // # ## ### …
-    "EmphasisMark",   // * or _ (italic) and ** or __ (bold)
-    "CodeMark",       // ` (inline code)
-    "StrikethroughMark", // ~~
-    "LinkMark",       // [ ] ( ) and the leading ! for images
-    "URL",            // the url part of a link or image
-    "QuoteMark",      // > (blockquote)
-    // ListMark and TaskMarker are intentionally NOT hidden — we want
-    // bullets / numbers / checkboxes visible at all times.
+    "HeaderMark",         // # ## ### …
+    "EmphasisMark",       // * or _ (italic) and ** or __ (bold)
+    "CodeMark",           // ` (inline code)
+    "StrikethroughMark",  // ~~
+    "LinkMark",           // [ ] ( ) and the leading ! for images
+    "URL",                // the url part of a link or image
+    "QuoteMark",          // > (blockquote)
+    // ListMark is replaced with a bullet widget below.
+    // TaskMarker stays visible — checkbox is the affordance.
 ]);
 
 class BulletWidget extends WidgetType {
@@ -55,12 +61,10 @@ export const livePreviewPlugin = ViewPlugin.fromClass(
         }
 
         update(update: ViewUpdate): void {
-            if (
-                update.docChanged ||
-                update.viewportChanged ||
-                update.selectionSet ||
-                update.focusChanged
-            ) {
+            // Only recompute when the document or visible viewport actually
+            // changes — selection moves no longer affect what we render
+            // because we always hide markers regardless of cursor position.
+            if (update.docChanged || update.viewportChanged) {
                 this.decorations = compute(update.view);
             }
         }
@@ -73,11 +77,6 @@ export const livePreviewPlugin = ViewPlugin.fromClass(
 function compute(view: EditorView): DecorationSet {
     const builder = new RangeSetBuilder<Decoration>();
     const tree = syntaxTree(view.state);
-    const sel = view.state.selection.main;
-    const cursorLine = view.state.doc.lineAt(sel.head);
-
-    // Track which list items have already been processed so we don't
-    // repeat the bullet substitution.
     const processedLists = new Set<number>();
 
     for (const { from, to } of view.visibleRanges) {
@@ -86,35 +85,23 @@ function compute(view: EditorView): DecorationSet {
             to,
             enter(node) {
                 const name = node.type.name;
-                const onCursorLine =
-                    node.from >= cursorLine.from && node.to <= cursorLine.to;
 
-                // Hide marker nodes when the caret is on a different line.
-                if (HIDDEN_MARKERS.has(name) && !onCursorLine) {
-                    // For multi-line selection, skip hiding inside selection
-                    // so the user can clearly see what they're editing.
-                    if (sel.from !== sel.to && node.from >= sel.from && node.to <= sel.to) {
-                        return;
-                    }
+                if (HIDDEN_MARKERS.has(name)) {
                     builder.add(node.from, node.to, Decoration.replace({}));
+                    return;
                 }
 
-                // Replace the dash/asterisk in bullet lists with a real bullet.
                 if (name === "ListMark" && !processedLists.has(node.from)) {
                     processedLists.add(node.from);
                     const text = view.state.sliceDoc(node.from, node.to);
                     if (text === "-" || text === "*" || text === "+") {
-                        // Don't replace if cursor is on this line (let user
-                        // see the source).
-                        if (!onCursorLine) {
-                            builder.add(
-                                node.from,
-                                node.to,
-                                Decoration.replace({
-                                    widget: new BulletWidget("•"),
-                                })
-                            );
-                        }
+                        builder.add(
+                            node.from,
+                            node.to,
+                            Decoration.replace({
+                                widget: new BulletWidget("•"),
+                            })
+                        );
                     }
                 }
             },
