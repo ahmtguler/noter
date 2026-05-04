@@ -43,6 +43,7 @@ export function buildTheme(appearance: EditorAppearance): Extension {
             ".cm-scroller": { fontFamily: "inherit", overflowX: "hidden" },
             ".cm-line": { padding: "0" },
             ".cm-link": { color: accent },
+            ".cm-bullet-widget": { color: secondary, fontWeight: "600" },
         },
         { dark: isDark }
     );
