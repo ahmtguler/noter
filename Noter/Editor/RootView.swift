@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Main popup content: title bar at the top with the current note's filename
@@ -29,36 +30,45 @@ struct RootView: View {
                 .padding(.top, 60)
             }
         }
-        .background(VisualEffectBackground(material: .hudWindow, blendingMode: .behindWindow))
+        .background(
+            VisualEffectBackground(material: .hudWindow, blendingMode: .behindWindow)
+                .ignoresSafeArea()
+        )
         .background(hiddenShortcuts)
+        .ignoresSafeArea()
         .frame(minWidth: 380, minHeight: 360)
         .onAppear { ensureAnOpenNote() }
     }
 
     private var titleBar: some View {
-        HStack(spacing: 8) {
-            // Reserve space for the macOS traffic-light buttons on the left.
-            Color.clear.frame(width: 60, height: 1)
-            Spacer(minLength: 0)
-            Text(currentTitle)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: 0)
-            pinToggle
-                .frame(width: 60, alignment: .trailing)
+        ZStack {
+            // Drag region: the entire title bar is grabbable.
+            WindowDragRegion()
+            HStack(spacing: 6) {
+                Spacer(minLength: 12)
+                Text(currentTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 12)
+            }
+            HStack {
+                pinToggle
+                Spacer()
+                closeButton
+            }
+            .padding(.horizontal, 10)
         }
-        .padding(.horizontal, 8)
-        .frame(height: 38)
+        .frame(height: 36)
     }
 
     private var currentTitle: String {
         if let note = app.editor.currentNote {
             return note.title
         }
-        return app.editor.body.isEmpty ? "New note" : Slugify.title(from: app.editor.body)
-            .nonEmptyOrFallback("New note")
+        let derived = Slugify.title(from: app.editor.body)
+        return derived.isEmpty ? "New note" : derived
     }
 
     private var pinToggle: some View {
@@ -68,12 +78,27 @@ struct RootView: View {
             Image(systemName: pinned ? "pin.fill" : "pin")
                 .foregroundStyle(pinned ? AnyShapeStyle(Color.accentColor) :
                     AnyShapeStyle(HierarchicalShapeStyle.secondary))
-                .font(.system(size: 13, weight: .medium))
-                .padding(6)
+                .font(.system(size: 12, weight: .medium))
+                .frame(width: 22, height: 22)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(pinned ? "Unpin (hide on focus loss)" : "Pin (keep on top)")
+    }
+
+    private var closeButton: some View {
+        Button {
+            NSApp.keyWindow?.orderOut(nil)
+        } label: {
+            Image(systemName: "xmark")
+                .foregroundStyle(.secondary)
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 22, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .keyboardShortcut("w", modifiers: .command)
+        .help("Hide (⌘W)")
     }
 
     private var hiddenShortcuts: some View {
@@ -105,8 +130,19 @@ struct RootView: View {
     }
 }
 
-private extension String {
-    func nonEmptyOrFallback(_ fallback: String) -> String {
-        isEmpty ? fallback : self
+/// Lets the title bar serve as a window-drag handle. AppKit normally provides
+/// this via the title bar; since we hide the buttons and draw our own bar,
+/// we re-expose the drag affordance with `mouseDownCanMoveWindow = true`.
+private struct WindowDragRegion: NSViewRepresentable {
+    func makeNSView(context _: Context) -> NSView {
+        DragView()
+    }
+
+    func updateNSView(_: NSView, context _: Context) {}
+
+    private final class DragView: NSView {
+        override var mouseDownCanMoveWindow: Bool {
+            true
+        }
     }
 }
