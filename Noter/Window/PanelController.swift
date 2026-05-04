@@ -40,9 +40,11 @@ final class PanelController: NSObject {
         restoreFrame(into: panel)
         suppressHideUntil = Date().addingTimeInterval(suppressHideWindow)
         // LSUIElement apps don't auto-activate; without this the panel can
-        // appear and immediately receive a spurious resignKey.
+        // appear and immediately receive a spurious resignKey. orderFrontRegardless
+        // forces the panel visible even if the app isn't quite considered active yet.
         NSApp.activate(ignoringOtherApps: true)
-        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+        panel.makeKey()
     }
 
     func hide() {
@@ -68,12 +70,19 @@ final class PanelController: NSObject {
     private func restoreFrame(into panel: PopupPanel) {
         if let saved = defaults.string(forKey: SettingsKey.popupFrame) {
             let frame = NSRectFromString(saved)
-            if frame != .zero {
+            if frame != .zero, isOnVisibleScreen(frame) {
                 panel.setFrame(frame, display: false)
                 return
             }
         }
         panel.center()
+    }
+
+    /// Guard against frames saved on a screen that's no longer attached, or so
+    /// far off-screen that the panel would appear invisible.
+    private func isOnVisibleScreen(_ frame: NSRect) -> Bool {
+        guard frame.width > 100, frame.height > 100 else { return false }
+        return NSScreen.screens.contains { $0.visibleFrame.intersects(frame) }
     }
 
     fileprivate func persistFrame() {

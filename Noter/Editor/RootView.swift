@@ -56,6 +56,8 @@ struct RootView: View {
                 .keyboardShortcut("p", modifiers: .command)
             Button("New note") { createAndOpenNewNote() }
                 .keyboardShortcut("n", modifiers: .command)
+            Button("Preferences") { PreferencesAction.open() }
+                .keyboardShortcut(",", modifiers: .command)
         }
         .buttonStyle(.plain)
         .opacity(0)
