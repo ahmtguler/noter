@@ -1,0 +1,11 @@
+--swiftversion 5.10
+--indent 4
+--maxwidth 120
+--self remove
+--stripunusedargs closure-only
+--commas inline
+--trimwhitespace always
+--linebreaks lf
+--semicolons never
+--header strip
+--exclude .build,DerivedData,Noter.xcodeproj,node_modules

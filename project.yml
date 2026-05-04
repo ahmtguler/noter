@@ -1,0 +1,89 @@
+name: Noter
+options:
+  bundleIdPrefix: io.gaiaswap
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+  developmentLanguage: en
+
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_STYLE: Automatic
+    DEAD_CODE_STRIPPING: YES
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    GCC_TREAT_WARNINGS_AS_ERRORS: YES
+
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: "2.2.1"
+
+targets:
+  Noter:
+    type: application
+    platform: macOS
+    sources:
+      - path: Noter
+    info:
+      path: Noter/Info.plist
+      properties:
+        CFBundleName: Noter
+        CFBundleDisplayName: Noter
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSUIElement: true
+        LSMinimumSystemVersion: "14.0"
+        NSHumanReadableCopyright: "Copyright © 2026 Ahmet Guler"
+        NSSupportsAutomaticTermination: false
+        NSSupportsSuddenTermination: false
+    entitlements:
+      path: Noter/Noter.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.files.user-selected.read-write: true
+        com.apple.security.files.bookmarks.app-scope: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.gaiaswap.noter
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        COMBINE_HIDPI_IMAGES: YES
+        ENABLE_PREVIEWS: YES
+    dependencies:
+      - package: KeyboardShortcuts
+
+  NoterTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: NoterTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.gaiaswap.noter.tests
+        GENERATE_INFOPLIST_FILE: YES
+        BUNDLE_LOADER: $(TEST_HOST)
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Noter.app/Contents/MacOS/Noter
+    dependencies:
+      - target: Noter
+
+schemes:
+  Noter:
+    build:
+      targets:
+        Noter: all
+        NoterTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - NoterTests
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

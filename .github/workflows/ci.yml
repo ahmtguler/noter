@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: Lint, test, build
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Install tools
+        run: |
+          brew update
+          brew install swiftlint swiftformat xcbeautify xcodegen
+
+      - name: Cache DerivedData
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-deriveddata-${{ hashFiles('project.yml', '**/*.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-deriveddata-
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: SwiftFormat (lint mode)
+        run: swiftformat --lint .
+
+      - name: SwiftLint
+        run: swiftlint --strict --reporter github-actions-logging
+
+      - name: Test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Noter.xcodeproj \
+            -scheme Noter \
+            -destination 'platform=macOS' \
+            | xcbeautify
+
+      - name: Build
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Noter.xcodeproj \
+            -scheme Noter \
+            -configuration Release \
+            -destination 'platform=macOS' \
+            | xcbeautify

@@ -1,0 +1,48 @@
+pre-commit:
+  parallel: true
+  commands:
+    format:
+      glob: "*.swift"
+      run: swiftformat {staged_files}
+      stage_fixed: true
+    lint:
+      glob: "*.swift"
+      run: |
+        if [ "$(xcode-select -p)" = "/Library/Developer/CommandLineTools" ]; then
+          echo "⚠️  Full Xcode not configured (xcode-select points to Command Line Tools)."
+          echo "    Skipping SwiftLint locally — CI will still enforce it on push."
+          exit 0
+        fi
+        swiftlint lint --strict --quiet {staged_files}
+
+commit-msg:
+  commands:
+    conventional:
+      run: npx --yes --package=@commitlint/cli --package=@commitlint/config-conventional -- commitlint --edit {1}
+
+pre-push:
+  commands:
+    build:
+      run: |
+        if [ ! -d Noter.xcodeproj ]; then
+          echo "ℹ️  Noter.xcodeproj not generated yet (run 'xcodegen generate'). Skipping build."
+          exit 0
+        fi
+        if [ "$(xcode-select -p)" = "/Library/Developer/CommandLineTools" ]; then
+          echo "⚠️  Full Xcode not configured. Skipping build — CI will enforce."
+          exit 0
+        fi
+        set -o pipefail
+        xcodebuild -project Noter.xcodeproj -scheme Noter -configuration Debug -destination 'platform=macOS' build | xcbeautify
+    test:
+      run: |
+        if [ ! -d Noter.xcodeproj ]; then
+          echo "ℹ️  Noter.xcodeproj not generated yet. Skipping tests."
+          exit 0
+        fi
+        if [ "$(xcode-select -p)" = "/Library/Developer/CommandLineTools" ]; then
+          echo "⚠️  Full Xcode not configured. Skipping tests — CI will enforce."
+          exit 0
+        fi
+        set -o pipefail
+        xcodebuild test -project Noter.xcodeproj -scheme Noter -destination 'platform=macOS' | xcbeautify
