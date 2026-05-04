@@ -32,6 +32,10 @@ public final class MarkdownCommands: ObservableObject {
         exec(.code)
     }
 
+    public func codeBlock() {
+        exec(.codeBlock)
+    }
+
     public func heading(_ level: Int) {
         exec(.heading, arg: String(level))
     }

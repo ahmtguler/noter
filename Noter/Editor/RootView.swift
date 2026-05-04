@@ -10,6 +10,8 @@ struct RootView: View {
     @State private var showSwitcher = false
     @StateObject private var commandsHolder = CommandsHolder()
     @AppStorage(SettingsKey.pinned) private var pinned = false
+    @AppStorage(SettingsKey.showFormattingToolbar)
+    private var showFormattingToolbar = SettingsKey.defaultShowFormattingToolbar
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -21,11 +23,13 @@ struct RootView: View {
                 ) { commands in
                     commandsHolder.commands = commands
                 }
-                Group {
-                    if let commands = commandsHolder.commands {
-                        ToolbarView(commands: commands)
-                    } else {
-                        Color.clear.frame(height: 36)
+                if showFormattingToolbar {
+                    Group {
+                        if let commands = commandsHolder.commands {
+                            ToolbarView(commands: commands)
+                        } else {
+                            Color.clear.frame(height: 36)
+                        }
                     }
                 }
             }
