@@ -29,9 +29,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             panelController = controller
 
-            menuBarController = MenuBarController { [weak controller] in
-                controller?.toggle()
-            }
+            menuBarController = MenuBarController(
+                onToggle: { [weak controller] in controller?.toggle() },
+                onShow: { [weak controller] in controller?.show() },
+                onShowPreferences: { PreferencesAction.open() }
+            )
             KeyboardShortcuts.onKeyDown(for: .toggleNoter) { [weak controller] in
                 controller?.toggle()
             }

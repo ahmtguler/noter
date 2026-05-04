@@ -1,14 +1,22 @@
 import AppKit
 
-/// Lives in the system menu bar. Left-click toggles the popup; right-click shows a
-/// small menu with "Show Noter" and "Quit Noter".
+/// Lives in the system menu bar. Left-click toggles the popup; right-click (or
+/// ⌃-click) opens a small menu with Show Noter, Preferences (⌘,), and Quit (⌘Q).
 @MainActor
 final class MenuBarController: NSObject {
     private let statusItem: NSStatusItem
     private let onToggle: () -> Void
+    private let onShow: () -> Void
+    private let onShowPreferences: () -> Void
 
-    init(onToggle: @escaping () -> Void) {
+    init(
+        onToggle: @escaping () -> Void,
+        onShow: @escaping () -> Void,
+        onShowPreferences: @escaping () -> Void
+    ) {
         self.onToggle = onToggle
+        self.onShow = onShow
+        self.onShowPreferences = onShowPreferences
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         configureButton()
@@ -29,7 +37,8 @@ final class MenuBarController: NSObject {
     @objc
     private func handleClick(_: Any?) {
         let event = NSApp.currentEvent
-        if event?.type == .rightMouseUp {
+        let modifiers = event?.modifierFlags ?? []
+        if event?.type == .rightMouseUp || modifiers.contains(.control) {
             showContextMenu()
         } else {
             onToggle()
@@ -38,16 +47,32 @@ final class MenuBarController: NSObject {
 
     private func showContextMenu() {
         let menu = NSMenu()
-        let show = NSMenuItem(title: "Show Noter", action: #selector(handleShow), keyEquivalent: "")
-        show.target = self
-        menu.addItem(show)
+
+        let showItem = NSMenuItem(
+            title: "Show Noter",
+            action: #selector(handleShow),
+            keyEquivalent: ""
+        )
+        showItem.target = self
+        menu.addItem(showItem)
+
+        let prefsItem = NSMenuItem(
+            title: "Preferences…",
+            action: #selector(handlePreferences),
+            keyEquivalent: ","
+        )
+        prefsItem.keyEquivalentModifierMask = [.command]
+        prefsItem.target = self
+        menu.addItem(prefsItem)
+
         menu.addItem(.separator())
-        let quit = NSMenuItem(
+
+        let quitItem = NSMenuItem(
             title: "Quit Noter",
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         )
-        menu.addItem(quit)
+        menu.addItem(quitItem)
 
         statusItem.menu = menu
         statusItem.button?.performClick(nil)
@@ -56,6 +81,11 @@ final class MenuBarController: NSObject {
 
     @objc
     private func handleShow() {
-        onToggle()
+        onShow()
+    }
+
+    @objc
+    private func handlePreferences() {
+        onShowPreferences()
     }
 }
