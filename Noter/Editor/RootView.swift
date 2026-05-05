@@ -49,8 +49,14 @@ struct RootView: View {
             }
         }
         .background(
-            VisualEffectBackground(material: .hudWindow, blendingMode: .behindWindow)
-                .ignoresSafeArea()
+            ZStack {
+                // Behind-window blur preserves the popup feel.
+                VisualEffectBackground(material: .hudWindow, blendingMode: .behindWindow)
+                // Dark fill on top of the blur cuts the see-through so content
+                // reads cleanly even over busy wallpapers.
+                Color.black.opacity(0.45)
+            }
+            .ignoresSafeArea()
         )
         .background(hiddenShortcuts)
         .ignoresSafeArea()
@@ -69,7 +75,9 @@ struct RootView: View {
 
     private var editorConfiguration: EditorConfiguration {
         EditorConfiguration(
-            theme: .system,
+            // Always dark — Noter is a HUD-style popup; light mode would
+            // clash with the dark translucent background.
+            theme: .dark,
             fontSize: 14,
             spellCheck: true,
             smartListContinuation: true,
