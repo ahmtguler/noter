@@ -20,3 +20,19 @@ struct ArrowCursorArea: NSViewRepresentable {
         }
     }
 }
+
+/// AppKit bridge for a reliable native tooltip on plain SwiftUI views.
+/// SwiftUI's `.help()` is unreliable on borderless rows in macOS 26.
+struct NativeTooltip: NSViewRepresentable {
+    let text: String
+
+    func makeNSView(context _: Context) -> NSView {
+        let view = NSView()
+        view.toolTip = text
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context _: Context) {
+        nsView.toolTip = text
+    }
+}

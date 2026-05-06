@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// ⌘K command palette. Floats over the editor as a thin list of actions
-/// the user can run against the current note or the app. Same chrome as
-/// the note switcher (search field + filtered list + arrow nav + Enter).
+/// ⌘K command palette. Two modes: a flat list of actions, and a
+/// "Recently Deleted" list with per-row Restore / Delete-permanently
+/// buttons. Mode is local state — switching back is "← Back" or Esc.
 struct CommandPaletteOverlay: View {
     @ObservedObject var store: NoteStore
     @ObservedObject var editor: EditorState
@@ -10,23 +10,56 @@ struct CommandPaletteOverlay: View {
     var onShowSwitcher: () -> Void
     var onShowPreferences: () -> Void
 
+    @State private var mode: Mode = .commands
     @State private var selectedIndex = 0
+    /// Cached snapshot of the trashed notes for the trash mode. Populated on
+    /// `enter(.trash)` and refreshed on each Restore / Delete action so the
+    /// list stays in sync without polling.
+    @State private var trashedSnapshot: [Note] = []
+
+    enum Mode: Equatable {
+        case commands
+        case trash
+    }
 
     var body: some View {
         VStack(spacing: 0) {
+            if mode == .trash {
+                trashHeader
+                Divider().opacity(0.4)
+            }
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(allCommands.enumerated()), id: \.element.id) { index, command in
-                            CommandRow(
-                                command: command,
-                                isSelected: index == selectedIndex
-                            )
-                            .id(index)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectedIndex = index
-                                commitSelection()
+                        switch mode {
+                        case .commands:
+                            ForEach(Array(allCommands.enumerated()), id: \.element.id) { index, command in
+                                CommandRow(
+                                    command: command,
+                                    isSelected: index == selectedIndex
+                                )
+                                .id(index)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedIndex = index
+                                    commitSelection()
+                                }
+                            }
+                        case .trash:
+                            if trashedSnapshot.isEmpty {
+                                emptyTrashState
+                            } else {
+                                ForEach(Array(trashedSnapshot.enumerated()), id: \.element.id) { index, note in
+                                    TrashRow(
+                                        note: note,
+                                        isSelected: index == selectedIndex,
+                                        onRestore: { restore(note) },
+                                        onPurge: { permanentlyDelete(note) }
+                                    )
+                                    .id(index)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { selectedIndex = index }
+                                }
                             }
                         }
                     }
@@ -41,10 +74,10 @@ struct CommandPaletteOverlay: View {
                 onMoveUp: moveSelection(by: -1),
                 onMoveDown: moveSelection(by: 1),
                 onCommit: commitSelection,
-                onCancel: { isShowing = false }
+                onCancel: cancelOrBack
             ))
         }
-        .frame(width: 420, height: heightForRows(allCommands.count))
+        .frame(width: 420, height: contentHeight)
         .background(
             VisualEffectBackground(material: .popover, blendingMode: .withinWindow)
         )
@@ -56,22 +89,72 @@ struct CommandPaletteOverlay: View {
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
     }
 
-    private func heightForRows(_ count: Int) -> CGFloat {
-        // Each row ~52pt + a 12pt vertical chrome budget. Capped so a future
-        // command list bigger than the popup still scrolls.
-        min(CGFloat(count) * 52 + 12, 380)
+    private var contentHeight: CGFloat {
+        switch mode {
+        case .commands:
+            return min(CGFloat(allCommands.count) * 52 + 12, 380)
+        case .trash:
+            let rows = max(trashedSnapshot.count, 1)
+            return min(CGFloat(rows) * 52 + 60, 420)
+        }
     }
+
+    private var trashHeader: some View {
+        HStack(spacing: 10) {
+            Button(action: backToCommands) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Back (Esc)")
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Recently Deleted")
+                    .font(.body.weight(.medium))
+                Text(trashHeaderSubtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+    }
+
+    private var trashHeaderSubtitle: String {
+        if trashedSnapshot.isEmpty { return "Empty" }
+        let plural = trashedSnapshot.count == 1 ? "" : "s"
+        return "\(trashedSnapshot.count) note\(plural) · auto-removed after 14 days"
+    }
+
+    private var emptyTrashState: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "tray")
+                .font(.system(size: 24, weight: .light))
+                .foregroundStyle(.tertiary)
+            Text("Nothing in Recently Deleted")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 36)
+    }
+
+    // MARK: - Commands
 
     private var allCommands: [PaletteCommand] {
         let currentURL = editor.currentNote?.url
         let isPinned = currentURL.map(store.isPinned) ?? false
+        let trashCount = store.trashedNotes().count
         return [
             PaletteCommand(
                 id: "new",
                 title: "New note",
                 subtitle: "Start a fresh blank draft",
                 icon: "square.and.pencil",
-                shortcut: "⌘N",
+                shortcut: "⌘ N",
                 isEnabled: true
             ) { newNote() },
             PaletteCommand(
@@ -79,7 +162,7 @@ struct CommandPaletteOverlay: View {
                 title: "Browse notes",
                 subtitle: "Open the note switcher",
                 icon: "magnifyingglass",
-                shortcut: "⌘P",
+                shortcut: "⌘ P",
                 isEnabled: true
             ) {
                 isShowing = false
@@ -106,18 +189,28 @@ struct CommandPaletteOverlay: View {
             PaletteCommand(
                 id: "delete",
                 title: "Delete note",
-                subtitle: currentURL == nil ? "No note open" : "Move file to trash",
+                subtitle: currentURL == nil ? "No note open" : "Move to Recently Deleted",
                 icon: "trash",
                 shortcut: nil,
                 isEnabled: currentURL != nil,
                 isDestructive: true
             ) { deleteCurrent() },
             PaletteCommand(
+                id: "trash",
+                title: "Recently Deleted",
+                subtitle: trashCount == 0
+                    ? "Empty"
+                    : "\(trashCount) note\(trashCount == 1 ? "" : "s") · restore or remove",
+                icon: "tray",
+                shortcut: nil,
+                isEnabled: true
+            ) { enter(.trash) },
+            PaletteCommand(
                 id: "preferences",
                 title: "Open Preferences",
                 subtitle: "Vault, theme, font size, hotkey",
                 icon: "gear",
-                shortcut: "⌘,",
+                shortcut: "⌘ ,",
                 isEnabled: true
             ) {
                 isShowing = false
@@ -128,26 +221,61 @@ struct CommandPaletteOverlay: View {
 
     private func moveSelection(by delta: Int) -> () -> Void {
         {
-            let last = allCommands.count - 1
+            let last = currentRowCount - 1
             guard last >= 0 else { return }
-            // Skip over disabled rows so arrow nav lands on actionable items.
             var next = selectedIndex + delta
-            while next >= 0 && next <= last && !allCommands[next].isEnabled {
-                next += delta
+            if mode == .commands {
+                while next >= 0, next <= last, !allCommands[next].isEnabled {
+                    next += delta
+                }
             }
             if next < 0 || next > last { return }
             selectedIndex = next
         }
     }
 
-    private func commitSelection() {
-        guard selectedIndex < allCommands.count else {
-            isShowing = false
-            return
+    private var currentRowCount: Int {
+        switch mode {
+        case .commands: allCommands.count
+        case .trash: trashedSnapshot.count
         }
-        let command = allCommands[selectedIndex]
-        guard command.isEnabled else { return }
-        command.action()
+    }
+
+    private func commitSelection() {
+        switch mode {
+        case .commands:
+            guard selectedIndex < allCommands.count else {
+                isShowing = false
+                return
+            }
+            let command = allCommands[selectedIndex]
+            guard command.isEnabled else { return }
+            command.action()
+        case .trash:
+            guard selectedIndex < trashedSnapshot.count else { return }
+            restore(trashedSnapshot[selectedIndex])
+        }
+    }
+
+    private func cancelOrBack() {
+        if mode == .trash {
+            backToCommands()
+        } else {
+            isShowing = false
+        }
+    }
+
+    private func enter(_ next: Mode) {
+        if next == .trash {
+            trashedSnapshot = store.trashedNotes()
+        }
+        selectedIndex = 0
+        mode = next
+    }
+
+    private func backToCommands() {
+        mode = .commands
+        selectedIndex = 0
     }
 
     // MARK: - Actions
@@ -188,6 +316,35 @@ struct CommandPaletteOverlay: View {
             editor.startBlankDraft()
         }
         isShowing = false
+    }
+
+    private func restore(_ note: Note) {
+        do {
+            let restored = try store.restoreTrashed(note.url)
+            editor.open(restored)
+        } catch {
+            NSLog("[Noter] restore failed: \(error)")
+            return
+        }
+        trashedSnapshot = store.trashedNotes()
+        clampSelection()
+        isShowing = false
+    }
+
+    private func permanentlyDelete(_ note: Note) {
+        do {
+            try store.permanentlyDeleteTrashed(note.url)
+        } catch {
+            NSLog("[Noter] purge failed: \(error)")
+            return
+        }
+        trashedSnapshot = store.trashedNotes()
+        clampSelection()
+    }
+
+    private func clampSelection() {
+        let last = max(0, trashedSnapshot.count - 1)
+        if selectedIndex > last { selectedIndex = last }
     }
 }
 
@@ -254,5 +411,78 @@ private struct CommandRow: View {
             return AnyShapeStyle(Color.red)
         }
         return AnyShapeStyle(HierarchicalShapeStyle.primary)
+    }
+}
+
+private struct TrashRow: View {
+    let note: Note
+    let isSelected: Bool
+    let onRestore: () -> Void
+    let onPurge: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(note.title)
+                    .font(.body.weight(.medium))
+                    .lineLimit(1)
+                Text("Deleted \(RelativeTime.string(from: note.modifiedAt))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer()
+            TrashIconButton(
+                systemName: "arrow.uturn.backward",
+                tooltip: "Restore",
+                tint: .accentColor,
+                action: onRestore
+            )
+            TrashIconButton(
+                systemName: "trash",
+                tooltip: "Delete permanently",
+                tint: .red,
+                action: onPurge
+            )
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(isSelected ? Color.accentColor.opacity(0.18) : .clear)
+    }
+}
+
+private struct TrashIconButton: View {
+    let systemName: String
+    let tooltip: String
+    let tint: Color
+    let action: () -> Void
+
+    @State private var isHovering = false
+    @State private var isPressed = false
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(tint)
+            .frame(width: 24, height: 24)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .contentShape(Rectangle())
+            .onHover { isHovering = $0 }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in isPressed = true }
+                    .onEnded { _ in
+                        if isPressed { action() }
+                        isPressed = false
+                    }
+            )
+            .background(NativeTooltip(text: tooltip))
+    }
+
+    private var background: Color {
+        if isPressed { return Color.primary.opacity(0.15) }
+        if isHovering { return Color.primary.opacity(0.08) }
+        return .clear
     }
 }
