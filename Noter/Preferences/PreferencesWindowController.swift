@@ -43,7 +43,22 @@ final class PreferencesWindowController: NSObject {
         window.standardWindowButton(.zoomButton)?.isHidden = true
         window.collectionBehavior = [.fullScreenAuxiliary, .moveToActiveSpace]
         window.setContentSize(NSSize(width: 520, height: 520))
+        window.delegate = self
         self.window = window
         return window
+    }
+}
+
+extension PreferencesWindowController: NSWindowDelegate {
+    /// When prefs closes we hand key focus back to the visible popup so its
+    /// own `windowDidResignKey` fires the next time the user clicks away,
+    /// restoring normal hide-on-blur behaviour. Without this, the popup
+    /// would have been frozen as "non-key but visible" since Preferences took
+    /// key from it on open.
+    func windowWillClose(_: Notification) {
+        guard let popup = NSApp.windows.first(where: { window in
+            window !== self.window && window.isVisible && window.canBecomeKey
+        }) else { return }
+        popup.makeKey()
     }
 }
