@@ -8,12 +8,15 @@ import SwiftUI
 struct RootView: View {
     @ObservedObject var app: AppViewModel
     @State private var showSwitcher = false
+    @State private var showCommandPalette = false
     @StateObject private var commandsHolder = CommandsHolder()
     @AppStorage(SettingsKey.pinned) private var pinned = false
     @AppStorage(SettingsKey.showFormattingToolbar)
     private var showFormattingToolbar = SettingsKey.defaultShowFormattingToolbar
     @AppStorage(SettingsKey.editorTheme)
     private var editorThemeRaw = SettingsKey.defaultEditorTheme
+    @AppStorage(SettingsKey.editorFontSize)
+    private var editorFontSizeRaw = SettingsKey.defaultEditorFontSize
     @Environment(\.colorScheme) private var systemColorScheme
 
     var body: some View {
@@ -50,6 +53,27 @@ struct RootView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+
+            if showCommandPalette {
+                ZStack {
+                    Color.black.opacity(0.001)
+                        .contentShape(Rectangle())
+                        .onTapGesture { showCommandPalette = false }
+                    CommandPaletteOverlay(
+                        store: app.store,
+                        editor: app.editor,
+                        isShowing: $showCommandPalette,
+                        onShowSwitcher: { showSwitcher = true },
+                        onShowPreferences: {
+                            NotificationCenter.default.post(
+                                name: .noterShowPreferences,
+                                object: nil
+                            )
+                        }
+                    )
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .background(
             ZStack {
@@ -66,8 +90,14 @@ struct RootView: View {
         .ignoresSafeArea()
         .frame(minWidth: 380, minHeight: 360)
         .onAppear { ensureAnOpenNote() }
+        .onChange(of: editorFontSizeRaw) { _, _ in resizeWindowIfAtDefault() }
         .onReceive(NotificationCenter.default.publisher(for: .noterShowSwitcher)) { _ in
+            showCommandPalette = false
             showSwitcher = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .noterShowCommandPalette)) { _ in
+            showSwitcher = false
+            showCommandPalette = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .noterNewNote)) { _ in
             createAndOpenNewNote()
@@ -94,10 +124,20 @@ struct RootView: View {
         }
     }
 
+    private var fontSizePreference: EditorFontSizePreference {
+        EditorFontSizePreference(rawValue: editorFontSizeRaw) ?? .medium
+    }
+
     private var editorConfiguration: EditorConfiguration {
-        EditorConfiguration(
-            theme: themePreference.editorTheme,
-            fontSize: 14,
+        // Resolve `.system` to a concrete `.light` / `.dark` here so the JS
+        // side never has to query `window.matchMedia` — WKWebView's
+        // `prefers-color-scheme` lags behind appearance flips, which left
+        // the editor text mismatched right after the user switched themes.
+        let resolvedTheme: EditorConfiguration.Theme =
+            effectiveColorScheme == .dark ? .dark : .light
+        return EditorConfiguration(
+            theme: resolvedTheme,
+            fontSize: fontSizePreference.pointSize,
             spellCheck: true,
             smartListContinuation: true,
             revealMarkersOnCursor: true,
@@ -108,7 +148,7 @@ struct RootView: View {
 
     private var titleBar: some View {
         ZStack {
-            WindowDragRegion()
+            WindowDragRegion(onDoubleClick: snapToTopRight)
             HStack(spacing: 6) {
                 Spacer(minLength: 12)
                 Text(currentTitle)
@@ -118,6 +158,10 @@ struct RootView: View {
                     .truncationMode(.middle)
                 Spacer(minLength: 12)
             }
+            // Let drags and double-clicks pass through the centered title
+            // text to the WindowDragRegion behind it. Without this the
+            // SwiftUI Text view eats clicks that land on the title.
+            .allowsHitTesting(false)
             HStack {
                 closeButton
                 Spacer()
@@ -126,6 +170,79 @@ struct RootView: View {
             .padding(.horizontal, 10)
         }
         .frame(height: 36)
+    }
+
+    /// Snaps the popup to a fixed top-right slot on the active screen.
+    /// Window size scales with the chosen font size so the layout stays
+    /// proportional. `visibleFrame` already excludes the menu bar.
+    private func snapToTopRight() {
+        guard let window = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible })
+        else { return }
+        let screen = window.screen ?? NSScreen.main
+        guard let visible = screen?.visibleFrame else { return }
+        let size = snapTargetSize
+        let margin: CGFloat = 16
+        let origin = NSPoint(
+            x: visible.maxX - size.width - margin,
+            y: visible.maxY - size.height - margin
+        )
+        let frame = NSRect(origin: origin, size: size)
+        window.setFrame(frame, display: true, animate: true)
+    }
+
+    private var snapTargetSize: NSSize {
+        defaultSize(for: fontSizePreference)
+    }
+
+    private func defaultSize(for pref: EditorFontSizePreference) -> NSSize {
+        switch pref {
+        case .small: NSSize(width: 480, height: 640)
+        case .medium: NSSize(width: 540, height: 700)
+        case .large: NSSize(width: 600, height: 760)
+        }
+    }
+
+    /// If the window is currently sized to one of the predefined defaults,
+    /// auto-resize to the new font preference's default. If the user has
+    /// manually resized to a custom size, leave it alone. The top-right
+    /// corner is held fixed so the resize feels anchored where the user
+    /// last placed it; the result is then clamped to the visible screen.
+    private func resizeWindowIfAtDefault() {
+        // Look up the popup by type — when the user changes font size from
+        // the Preferences window, NSApp.keyWindow is the prefs window, not
+        // the popup, so a generic "first visible" lookup would resize the
+        // wrong window.
+        guard let window = NSApp.windows.first(where: { $0 is PopupPanel }) else { return }
+        let currentSize = window.frame.size
+        let isAtKnownDefault = EditorFontSizePreference.allCases.contains { pref in
+            let target = defaultSize(for: pref)
+            return abs(currentSize.width - target.width) < 0.5 &&
+                abs(currentSize.height - target.height) < 0.5
+        }
+        guard isAtKnownDefault else { return }
+
+        let newSize = snapTargetSize
+        let topRight = NSPoint(x: window.frame.maxX, y: window.frame.maxY)
+        var newFrame = NSRect(
+            origin: NSPoint(x: topRight.x - newSize.width, y: topRight.y - newSize.height),
+            size: newSize
+        )
+
+        if let visible = (window.screen ?? NSScreen.main)?.visibleFrame {
+            if newFrame.maxX > visible.maxX {
+                newFrame.origin.x = visible.maxX - newFrame.width
+            }
+            if newFrame.minX < visible.minX {
+                newFrame.origin.x = visible.minX
+            }
+            if newFrame.maxY > visible.maxY {
+                newFrame.origin.y = visible.maxY - newFrame.height
+            }
+            if newFrame.minY < visible.minY {
+                newFrame.origin.y = visible.minY
+            }
+        }
+        window.setFrame(newFrame, display: true, animate: true)
     }
 
     private var currentTitle: String {
@@ -197,19 +314,34 @@ final class CommandsHolder: ObservableObject {
     @Published var commands: MarkdownCommands?
 }
 
-/// Lets the title bar serve as a window-drag handle. AppKit normally provides
-/// this via the title bar; since we hide the buttons and draw our own bar,
-/// we re-expose the drag affordance with `mouseDownCanMoveWindow = true`.
+/// Lets the title bar serve as a window-drag handle. We can't use
+/// `mouseDownCanMoveWindow` here because we also need to detect a double
+/// click on the bar — that flag short-circuits AppKit's mouse delivery, so
+/// `mouseDown(with:)` would never fire with a clickCount > 1. Instead we
+/// handle mouseDown manually: clickCount 2 snaps to the top-right slot,
+/// anything else delegates to `NSWindow.performDrag(with:)`.
 private struct WindowDragRegion: NSViewRepresentable {
+    var onDoubleClick: () -> Void
+
     func makeNSView(context _: Context) -> NSView {
-        DragView()
+        let view = DragView()
+        view.onDoubleClick = onDoubleClick
+        return view
     }
 
-    func updateNSView(_: NSView, context _: Context) {}
+    func updateNSView(_ nsView: NSView, context _: Context) {
+        (nsView as? DragView)?.onDoubleClick = onDoubleClick
+    }
 
     private final class DragView: NSView {
-        override var mouseDownCanMoveWindow: Bool {
-            true
+        var onDoubleClick: (() -> Void)?
+
+        override func mouseDown(with event: NSEvent) {
+            if event.clickCount >= 2 {
+                onDoubleClick?()
+                return
+            }
+            window?.performDrag(with: event)
         }
     }
 }

@@ -31,7 +31,10 @@ struct SwitcherOverlay: View {
                             SwitcherRow(
                                 note: item.note,
                                 isSelected: index == selectedIndex,
-                                isCurrent: item.note.url == editor.currentNote?.url
+                                isCurrent: item.note.url == editor.currentNote?.url,
+                                isPinned: store.isPinned(item.note.url),
+                                onPin: { store.togglePin(item.note.url) },
+                                onDelete: { deleteNote(item.note) }
                             )
                             .id(index)
                             .contentShape(Rectangle())
@@ -42,44 +45,73 @@ struct SwitcherOverlay: View {
                         }
                     }
                 }
+                .background(ArrowCursorArea())
                 .onChange(of: selectedIndex) { _, new in
                     proxy.scrollTo(new, anchor: .center)
                 }
             }
         }
         .frame(width: 420, height: 360)
-        .background(.ultraThickMaterial)
+        .background(
+            VisualEffectBackground(material: .popover, blendingMode: .withinWindow)
+        )
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(.separator, lineWidth: 0.5)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
         )
-        .shadow(color: .black.opacity(0.3), radius: 30, y: 12)
+        .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
         .onChange(of: query) { _, _ in selectedIndex = 0 }
     }
 
     private var matches: [(note: Note, score: Int)] {
+        let raw: [(Note, Int)]
         if query.isEmpty {
-            return store.notes
+            raw = store.notes
                 .sorted { recencyKey($0) > recencyKey($1) }
                 .map { ($0, 0) }
+        } else {
+            let trimmed = query.trimmingCharacters(in: .whitespaces)
+            raw = store.notes
+                .compactMap { note -> (Note, Int)? in
+                    if let titleScore = FuzzyMatcher.score(query: trimmed, in: note.title) {
+                        return (note, titleScore + 1000)
+                    }
+                    if note.body.localizedCaseInsensitiveContains(trimmed) {
+                        return (note, 100)
+                    }
+                    return nil
+                }
+                .sorted { lhs, rhs in
+                    if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
+                    return recencyKey(lhs.0) > recencyKey(rhs.0)
+                }
         }
+        // Pinned notes float to the top, preserving the relative ordering
+        // produced above within each group.
+        let pinned = raw.filter { store.isPinned($0.0.url) }
+        let rest = raw.filter { !store.isPinned($0.0.url) }
+        return pinned + rest
+    }
 
-        let trimmed = query.trimmingCharacters(in: .whitespaces)
-        return store.notes
-            .compactMap { note -> (Note, Int)? in
-                if let titleScore = FuzzyMatcher.score(query: trimmed, in: note.title) {
-                    return (note, titleScore + 1000)
-                }
-                if note.body.localizedCaseInsensitiveContains(trimmed) {
-                    return (note, 100)
-                }
-                return nil
+    private func deleteNote(_ note: Note) {
+        let isOpen = editor.currentNote?.url == note.url
+        do {
+            try store.delete(note.url)
+        } catch {
+            NSLog("[Noter] delete failed: \(error)")
+            return
+        }
+        if isOpen {
+            if let next = store.notes.first {
+                editor.open(next)
+            } else {
+                editor.startBlankDraft()
             }
-            .sorted { lhs, rhs in
-                if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
-                return recencyKey(lhs.0) > recencyKey(rhs.0)
-            }
+        }
+        if selectedIndex >= matches.count {
+            selectedIndex = max(0, matches.count - 1)
+        }
     }
 
     private func recencyKey(_ note: Note) -> Date {
@@ -109,6 +141,9 @@ struct SwitcherRow: View {
     let note: Note
     let isSelected: Bool
     let isCurrent: Bool
+    let isPinned: Bool
+    let onPin: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
@@ -127,7 +162,7 @@ struct SwitcherRow: View {
                     }
                 }
                 HStack(spacing: 6) {
-                    Text(note.modifiedAt, style: .relative)
+                    Text(RelativeTime.string(from: note.modifiedAt))
                         .foregroundStyle(.secondary)
                         .font(.caption)
                     Text("·")
@@ -139,9 +174,78 @@ struct SwitcherRow: View {
                 }
             }
             Spacer()
+            RowIconButton(
+                systemName: isPinned ? "pin.fill" : "pin",
+                tooltip: isPinned ? "Unpin" : "Pin",
+                tint: isPinned ? .accentColor : nil,
+                action: onPin
+            )
+            RowIconButton(
+                systemName: "trash",
+                tooltip: "Delete",
+                tint: nil,
+                action: onDelete
+            )
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(isSelected ? Color.accentColor.opacity(0.18) : .clear)
+    }
+}
+
+/// Hover/press-aware icon button with a tooltip. SwiftUI's `.help()` on
+/// borderless buttons is unreliable in macOS 26 popups, so we apply the
+/// tooltip to the underlying NSView and render hover/press feedback
+/// ourselves with a tinted background.
+private struct RowIconButton: View {
+    let systemName: String
+    let tooltip: String
+    let tint: Color?
+    let action: () -> Void
+
+    @State private var isHovering = false
+    @State private var isPressed = false
+
+    var body: some View {
+        Image(systemName: systemName)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(tint.map { AnyShapeStyle($0) }
+                ?? AnyShapeStyle(HierarchicalShapeStyle.secondary))
+            .frame(width: 24, height: 24)
+            .background(background)
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            .contentShape(Rectangle())
+            .onHover { isHovering = $0 }
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { _ in isPressed = true }
+                    .onEnded { _ in
+                        if isPressed { action() }
+                        isPressed = false
+                    }
+            )
+            .background(NativeTooltip(text: tooltip))
+    }
+
+    private var background: Color {
+        if isPressed { return Color.primary.opacity(0.15) }
+        if isHovering { return Color.primary.opacity(0.08) }
+        return .clear
+    }
+}
+
+/// Bridges into AppKit just to get a reliable native tooltip. SwiftUI's
+/// `.help()` doesn't surface on borderless rows here.
+private struct NativeTooltip: NSViewRepresentable {
+    let text: String
+
+    func makeNSView(context _: Context) -> NSView {
+        let view = NSView()
+        view.toolTip = text
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context _: Context) {
+        nsView.toolTip = text
     }
 }

@@ -44,6 +44,9 @@ final class PanelKeyMonitor {
         case "p":
             NotificationCenter.default.post(name: .noterShowSwitcher, object: nil)
             return nil
+        case "k":
+            NotificationCenter.default.post(name: .noterShowCommandPalette, object: nil)
+            return nil
         case ",":
             NotificationCenter.default.post(name: .noterShowPreferences, object: nil)
             return nil
@@ -56,5 +59,6 @@ final class PanelKeyMonitor {
 extension Notification.Name {
     static let noterNewNote = Notification.Name("io.gaiaswap.noter.newNote")
     static let noterShowSwitcher = Notification.Name("io.gaiaswap.noter.showSwitcher")
+    static let noterShowCommandPalette = Notification.Name("io.gaiaswap.noter.showCommandPalette")
     static let noterShowPreferences = Notification.Name("io.gaiaswap.noter.showPreferences")
 }

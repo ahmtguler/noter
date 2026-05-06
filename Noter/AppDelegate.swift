@@ -20,6 +20,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 AnyView(RootView(app: viewModel))
             })
             controller.onWillShow = { [weak controller] in
+                // Cheap opportunistic purge — runs every time the popup opens
+                // so trash entries older than 14 days don't accumulate even
+                // if the app is left running for weeks.
+                viewModel.store.purgeExpiredTrash()
                 guard let controller else { return }
                 let minutes = UserDefaults.standard.object(forKey: SettingsKey.idleNewNoteMinutes) as? Int
                     ?? SettingsKey.defaultIdleNewNoteMinutes
