@@ -8,6 +8,7 @@ final class PanelController: NSObject {
 
     private var panel: PopupPanel?
     private var keyMonitor: PanelKeyMonitor?
+    private var defaultsObserver: NSObjectProtocol?
     private let defaults: UserDefaults
     private let contentFactory: ContentFactory
     private(set) var lastHiddenAt: Date?
@@ -25,6 +26,23 @@ final class PanelController: NSObject {
         self.defaults = defaults
         self.contentFactory = contentFactory
         super.init()
+        // React to theme changes immediately so the visual effect view's
+        // appearance follows the user's choice, even while the panel is open.
+        defaultsObserver = NotificationCenter.default.addObserver(
+            forName: UserDefaults.didChangeNotification,
+            object: defaults,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.applyAppearance()
+            }
+        }
+    }
+
+    deinit {
+        if let defaultsObserver {
+            NotificationCenter.default.removeObserver(defaultsObserver)
+        }
     }
 
     func toggle() {
@@ -38,12 +56,20 @@ final class PanelController: NSObject {
     func show() {
         onWillShow?()
         let panel = ensurePanel()
+        applyAppearance()
         restoreFrame(into: panel)
         suppressHideUntil = Date().addingTimeInterval(suppressHideWindow)
         NSApp.activate(ignoringOtherApps: true)
         panel.orderFrontRegardless()
         panel.makeKey()
         keyMonitor?.install()
+    }
+
+    private func applyAppearance() {
+        guard let panel else { return }
+        let raw = defaults.string(forKey: SettingsKey.editorTheme) ?? SettingsKey.defaultEditorTheme
+        let preference = EditorAppearancePreference(rawValue: raw) ?? .system
+        panel.appearance = preference.nsAppearance
     }
 
     func hide() {
