@@ -66,10 +66,16 @@ final class PanelController: NSObject {
     }
 
     private func applyAppearance() {
-        guard let panel else { return }
         let raw = defaults.string(forKey: SettingsKey.editorTheme) ?? SettingsKey.defaultEditorTheme
         let preference = EditorAppearancePreference(rawValue: raw) ?? .system
-        panel.appearance = preference.nsAppearance
+        // Drive the choice through `NSApp.appearance` so explicit dark and
+        // system-dark resolve through the *same* path (panel inherits, no
+        // per-window appearance override). Setting `panel.appearance` directly
+        // produces a subtly different chrome (HUD-style lighter edge) than
+        // letting the window inherit from the app — which is the bug we're
+        // working around here.
+        NSApp.appearance = preference.nsAppearance
+        panel?.appearance = nil
     }
 
     func hide() {
@@ -139,6 +145,21 @@ extension PanelController: NSWindowDelegate {
         if let suppressUntil = suppressHideUntil, Date() < suppressUntil {
             return
         }
+        // Don't hide if focus moved to another window of *this* app (most
+        // commonly the Preferences window). The user is still working with
+        // Noter — it would be jarring for the popup to disappear behind a
+        // dialog they just opened. The popup is restored to its normal
+        // hide-on-blur behaviour as soon as the other window closes and
+        // some external app gains focus.
+        if hasOtherVisibleAppWindow {
+            return
+        }
         hide()
+    }
+
+    private var hasOtherVisibleAppWindow: Bool {
+        NSApp.windows.contains { window in
+            window !== panel && window.isVisible && window.canBecomeKey
+        }
     }
 }

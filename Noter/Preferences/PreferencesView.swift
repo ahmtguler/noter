@@ -15,6 +15,8 @@ struct PreferencesView: View {
     private var showFormattingToolbar = SettingsKey.defaultShowFormattingToolbar
     @AppStorage(SettingsKey.editorTheme)
     private var editorThemeRaw = SettingsKey.defaultEditorTheme
+    @AppStorage(SettingsKey.editorFontSize)
+    private var editorFontSizeRaw = SettingsKey.defaultEditorFontSize
     @State private var vaultDisplay = ""
 
     private let idleHelp = """
@@ -55,6 +57,15 @@ struct PreferencesView: View {
                 Text("Match system follows your macOS appearance setting.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                Picker("Font size", selection: fontSizeBinding) {
+                    ForEach(EditorFontSizePreference.allCases) { preference in
+                        Text(preference.label).tag(preference)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text("Headings scale with the body size.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             }
 
             Section("Shortcut") {
@@ -93,6 +104,13 @@ struct PreferencesView: View {
         Binding(
             get: { EditorAppearancePreference(rawValue: editorThemeRaw) ?? .system },
             set: { editorThemeRaw = $0.rawValue }
+        )
+    }
+
+    private var fontSizeBinding: Binding<EditorFontSizePreference> {
+        Binding(
+            get: { EditorFontSizePreference(rawValue: editorFontSizeRaw) ?? .medium },
+            set: { editorFontSizeRaw = $0.rawValue }
         )
     }
 
