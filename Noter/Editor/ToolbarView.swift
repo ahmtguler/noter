@@ -38,17 +38,17 @@ struct ToolbarView: View {
                 commands.link()
             }
             divider
-            iconButton("curlybraces", help: "Code block", isActive: false) {
-                commands.codeBlock()
-            }
             iconButton(
                 "chevron.left.forwardslash.chevron.right",
-                help: "Inline code",
+                help: "Inline code — `code`",
                 isActive: isActive(.code)
             ) {
                 commands.code()
             }
-            iconButton("quote.opening", help: "Quote (⇧⌘9)", isActive: isActive(.quote)) {
+            iconButton("curlybraces", help: "Fenced code block — ```", isActive: false) {
+                commands.codeBlock()
+            }
+            iconButton("quote.opening", help: "Block quote", isActive: isActive(.quote)) {
                 commands.quote()
             }
             divider
@@ -115,7 +115,15 @@ struct ToolbarView: View {
 }
 
 private let activeForegroundColor = NSColor.labelColor
-private let inactiveForegroundColor = NSColor.secondaryLabelColor.withAlphaComponent(0.7)
+/// Dynamic color so the inactive tone tracks the window's appearance live.
+/// `NSColor.secondaryLabelColor.withAlphaComponent(_:)` returns a static
+/// color resolved at call time, which froze the toolbar to light-mode tones.
+private let inactiveForegroundColor: NSColor = .init(name: nil) { appearance in
+    let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+    return isDark
+        ? NSColor.white.withAlphaComponent(0.55)
+        : NSColor.black.withAlphaComponent(0.55)
+}
 
 private func activeBackgroundColor() -> CGColor {
     NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor

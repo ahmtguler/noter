@@ -342,18 +342,27 @@ function applyLink(view: EditorView) {
     const state = view.state;
     const sel = state.selection.main;
     const sliced = state.doc.sliceString(sel.from, sel.to);
+    const placeholder = "url";
     if (sel.empty) {
+        // Empty selection: insert `[](url)` with `url` pre-selected so the
+        // user types directly into the URL slot. After they fill it the
+        // link becomes a valid Link node and the markers + URL hide.
+        const insertion = `[](${placeholder})`;
+        const urlStart = sel.from + 3; // after "[]("
         view.dispatch({
-            changes: { from: sel.from, to: sel.to, insert: "[]()" },
-            selection: EditorSelection.single(sel.from + 1),
+            changes: { from: sel.from, to: sel.to, insert: insertion },
+            selection: EditorSelection.single(urlStart, urlStart + placeholder.length),
             scrollIntoView: true,
         });
         return;
     }
-    const replacement = `[${sliced}]()`;
+    // Selection: wrap as `[selected](url)` and select the placeholder so the
+    // user can type the URL immediately.
+    const replacement = `[${sliced}](${placeholder})`;
+    const urlStart = sel.from + 1 + sliced.length + 2; // after "[selected]("
     view.dispatch({
         changes: { from: sel.from, to: sel.to, insert: replacement },
-        selection: EditorSelection.single(sel.from + replacement.length - 1),
+        selection: EditorSelection.single(urlStart, urlStart + placeholder.length),
         scrollIntoView: true,
     });
 }

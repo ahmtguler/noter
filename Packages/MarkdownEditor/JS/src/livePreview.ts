@@ -64,9 +64,10 @@ class CheckboxWidget extends WidgetType {
         span.className = "cm-task-checkbox" + (this.checked ? " cm-task-checkbox-checked" : "");
         span.setAttribute("role", "checkbox");
         span.setAttribute("aria-checked", String(this.checked));
-        if (this.checked) {
-            span.textContent = "✓";
-        }
+        // Intentionally no inner glyph. A checkmark character has its own
+        // baseline metrics that pushed the inline-block box taller than the
+        // surrounding line, which made the line jump on toggle. A simple
+        // colour fill is enough to communicate "checked".
         return span;
     }
     ignoreEvent(): boolean {
@@ -203,6 +204,28 @@ function compute(view: EditorView): DecorationSet {
                 }
             },
         });
+    }
+
+    // Pass 3: HTML underline `<u>...</u>`. The markdown parser doesn't tag
+    // raw HTML, so we drive this purely from text. Same deal as a markdown
+    // mark: hide the open/close tags, decorate the inner range as underlined.
+    const UNDERLINE_REGEX = /<u>([^<]*?)<\/u>/g;
+    for (const { from, to } of view.visibleRanges) {
+        const text = view.state.sliceDoc(from, to);
+        let match: RegExpExecArray | null;
+        while ((match = UNDERLINE_REGEX.exec(text)) !== null) {
+            const matchStart = from + match.index;
+            const innerStart = matchStart + 3; // length of "<u>"
+            const innerEnd = innerStart + match[1].length;
+            const matchEnd = innerEnd + 4; // length of "</u>"
+            decos.push(Decoration.replace({}).range(matchStart, innerStart));
+            if (innerEnd > innerStart) {
+                decos.push(
+                    Decoration.mark({ class: "cm-html-underline" }).range(innerStart, innerEnd)
+                );
+            }
+            decos.push(Decoration.replace({}).range(innerEnd, matchEnd));
+        }
     }
 
     decos.sort((a, b) => a.from - b.from || a.to - b.to);
