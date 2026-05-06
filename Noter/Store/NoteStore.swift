@@ -24,23 +24,47 @@ final class NoteStore: ObservableObject {
         self.defaults = defaults
         try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: trashFolder, withIntermediateDirectories: true)
+        migrateLegacyTrashIfNeeded()
         purgeExpiredTrash()
         let paths = (defaults.array(forKey: SettingsKey.pinnedNotes) as? [String]) ?? []
         pinnedPaths = Set(paths)
         try reload()
     }
 
-    /// Sibling folder that holds soft-deleted notes for `trashTTL` before
-    /// being permanently removed. Sibling — not nested — so the user can
-    /// see/manage it in Obsidian if they want, and so Obsidian doesn't
-    /// re-index trashed notes as live ones.
+    /// Soft-deleted notes live here until purged. Nested inside the notes
+    /// subfolder so everything Noter-related stays in a single umbrella
+    /// folder the user picks. `reload()` lists `.md` files non-recursively,
+    /// so files in this subfolder don't show up as live notes.
     var trashFolder: URL {
-        folder.deletingLastPathComponent().appendingPathComponent("Recently Deleted")
+        folder.appendingPathComponent("Recently Deleted")
     }
 
     /// How long a soft-deleted note lives in `trashFolder` before being
     /// permanently removed. 14 days.
     private let trashTTL: TimeInterval = 14 * 24 * 60 * 60
+
+    /// One-time migration: prior versions stored the trash folder as a
+    /// sibling of the notes subfolder. Move any files from there into the
+    /// new nested location so users don't lose recent trash on upgrade.
+    private func migrateLegacyTrashIfNeeded() {
+        let legacy = folder.deletingLastPathComponent()
+            .appendingPathComponent("Recently Deleted")
+        guard fileManager.fileExists(atPath: legacy.path),
+              legacy != trashFolder
+        else { return }
+        guard let items = try? fileManager.contentsOfDirectory(
+            at: legacy,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        ) else { return }
+        for item in items {
+            let dest = uniqueTrashURL(for: item.lastPathComponent)
+            try? fileManager.moveItem(at: item, to: dest)
+        }
+        if (try? fileManager.contentsOfDirectory(atPath: legacy.path).isEmpty) == true {
+            try? fileManager.removeItem(at: legacy)
+        }
+    }
 
     func reload() throws {
         purgeExpiredTrash()
@@ -122,6 +146,48 @@ final class NoteStore: ObservableObject {
         notes.removeAll { $0.url == url }
         if pinnedPaths.remove(url.path) != nil {
             persistPins()
+        }
+    }
+
+    /// In-memory snapshot of the trash folder. Recomputed on demand —
+    /// callers should refresh after restore/purge to redraw the list.
+    func trashedNotes() -> [Note] {
+        guard fileManager.fileExists(atPath: trashFolder.path) else { return [] }
+        let contents = (try? fileManager.contentsOfDirectory(
+            at: trashFolder,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]
+        )) ?? []
+        return contents
+            .filter { $0.pathExtension.lowercased() == "md" }
+            .compactMap { url in
+                guard let body = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+                let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate ?? .distantPast
+                return Note(url: url, body: body, modifiedAt: mtime, openedAt: nil)
+            }
+            .sorted { $0.modifiedAt > $1.modifiedAt }
+    }
+
+    /// Move a trashed note back into the live folder and re-index it.
+    /// Filename collisions get a numeric suffix.
+    @discardableResult
+    func restoreTrashed(_ url: URL) throws -> Note {
+        let stem = url.deletingPathExtension().lastPathComponent
+        let dest = uniqueURL(for: stem)
+        try fileManager.moveItem(at: url, to: dest)
+        let body = (try? String(contentsOf: dest, encoding: .utf8)) ?? ""
+        let mtime = (try? dest.resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate ?? Date()
+        let note = Note(url: dest, body: body, modifiedAt: mtime, openedAt: nil)
+        notes.insert(note, at: 0)
+        return note
+    }
+
+    /// Permanently remove a single trashed file (no TTL wait).
+    func permanentlyDeleteTrashed(_ url: URL) throws {
+        if fileManager.fileExists(atPath: url.path) {
+            try fileManager.removeItem(at: url)
         }
     }
 
