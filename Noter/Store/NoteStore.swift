@@ -226,14 +226,17 @@ final class NoteStore: ObservableObject {
         }
     }
 
-    /// Creates a copy of the note's body as a new `.md` file. The new note
-    /// gets a unique filename (suffix " 2", " 3", … if needed).
+    /// Creates a copy of the note's body as a new `.md` file. The duplicate's
+    /// title line gets a `(copy)` suffix (or `(copy 2)`, … if it's already a
+    /// copy) so the user can tell the new note apart from the original. The
+    /// filename auto-derives from that title via the regular slug flow.
     @discardableResult
     func duplicate(_ url: URL) throws -> Note {
         guard let source = notes.first(where: { $0.url == url }) else {
             throw NSError(domain: "NoteStore", code: 1)
         }
-        return try createNote(initialBody: source.body)
+        let duplicatedBody = Slugify.bodyMarkedAsDuplicate(source.body)
+        return try createNote(initialBody: duplicatedBody)
     }
 
     func isPinned(_ url: URL) -> Bool {

@@ -45,13 +45,15 @@ struct SwitcherOverlay: View {
                         }
                     }
                 }
-                .background(ArrowCursorArea())
                 .onChange(of: selectedIndex) { _, new in
                     proxy.scrollTo(new, anchor: .center)
                 }
             }
         }
         .frame(width: 380, height: 360)
+        // Arrow-cursor rect on the outer frame so it covers the row area;
+        // SearchField still owns its own I-beam rect inside its bounds.
+        .background(ArrowCursorArea())
         .background(
             VisualEffectBackground(material: .hudWindow, blendingMode: .withinWindow)
         )
@@ -187,9 +189,14 @@ struct SwitcherRow: View {
                 action: onDelete
             )
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(isSelected ? Color.accentColor.opacity(0.18) : .clear)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? Color.accentColor.opacity(0.22) : Color.clear)
+        )
+        .padding(.horizontal, 6)
+        .padding(.vertical, 1)
     }
 }
 
