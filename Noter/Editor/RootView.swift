@@ -12,6 +12,9 @@ struct RootView: View {
     @AppStorage(SettingsKey.pinned) private var pinned = false
     @AppStorage(SettingsKey.showFormattingToolbar)
     private var showFormattingToolbar = SettingsKey.defaultShowFormattingToolbar
+    @AppStorage(SettingsKey.editorTheme)
+    private var editorThemeRaw = SettingsKey.defaultEditorTheme
+    @Environment(\.colorScheme) private var systemColorScheme
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -52,12 +55,13 @@ struct RootView: View {
             ZStack {
                 // Behind-window blur preserves the popup feel.
                 VisualEffectBackground(material: .hudWindow, blendingMode: .behindWindow)
-                // Dark fill on top of the blur cuts the see-through so content
-                // reads cleanly even over busy wallpapers.
-                Color.black.opacity(0.45)
+                // Theme-tinted overlay cuts the see-through so content reads
+                // cleanly even over busy wallpapers.
+                overlayColor
             }
             .ignoresSafeArea()
         )
+        .preferredColorScheme(themePreference.colorScheme)
         .background(hiddenShortcuts)
         .ignoresSafeArea()
         .frame(minWidth: 380, minHeight: 360)
@@ -68,16 +72,31 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .noterNewNote)) { _ in
             createAndOpenNewNote()
         }
-        .onReceive(NotificationCenter.default.publisher(for: .noterShowPreferences)) { _ in
-            PreferencesAction.open()
+        // .noterShowPreferences is handled by AppDelegate via its
+        // PreferencesWindowController — no observer needed here.
+    }
+
+    private var themePreference: EditorAppearancePreference {
+        EditorAppearancePreference(rawValue: editorThemeRaw) ?? .system
+    }
+
+    /// Resolves "system" against the SwiftUI environment so the overlay color
+    /// always matches the actual rendered appearance.
+    private var effectiveColorScheme: ColorScheme {
+        themePreference.colorScheme ?? systemColorScheme
+    }
+
+    private var overlayColor: Color {
+        switch effectiveColorScheme {
+        case .light: Color.white.opacity(0.55)
+        case .dark: Color.black.opacity(0.45)
+        @unknown default: Color.black.opacity(0.45)
         }
     }
 
     private var editorConfiguration: EditorConfiguration {
         EditorConfiguration(
-            // Always dark — Noter is a HUD-style popup; light mode would
-            // clash with the dark translucent background.
-            theme: .dark,
+            theme: themePreference.editorTheme,
             fontSize: 14,
             spellCheck: true,
             smartListContinuation: true,

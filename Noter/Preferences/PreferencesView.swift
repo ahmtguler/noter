@@ -2,8 +2,9 @@ import AppKit
 import KeyboardShortcuts
 import SwiftUI
 
-/// Standard macOS Settings pane. Lets the user pick the vault folder, change
-/// the subfolder name, and rebind the global hotkey.
+/// macOS Preferences pane. Lets the user pick the vault folder, change the
+/// subfolder name, rebind the global hotkey, set behavioural toggles, and
+/// pick the editor's appearance theme.
 struct PreferencesView: View {
     @ObservedObject var app: AppViewModel
 
@@ -12,6 +13,8 @@ struct PreferencesView: View {
     private var idleNewNoteMinutes = SettingsKey.defaultIdleNewNoteMinutes
     @AppStorage(SettingsKey.showFormattingToolbar)
     private var showFormattingToolbar = SettingsKey.defaultShowFormattingToolbar
+    @AppStorage(SettingsKey.editorTheme)
+    private var editorThemeRaw = SettingsKey.defaultEditorTheme
     @State private var vaultDisplay = ""
 
     private let idleHelp = """
@@ -38,6 +41,18 @@ struct PreferencesView: View {
                         .onSubmit { app.reloadVault() }
                 }
                 Text("Notes are saved as .md files in this subfolder so Obsidian sees them automatically.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("Appearance") {
+                Picker("Theme", selection: themeBinding) {
+                    ForEach(EditorAppearancePreference.allCases) { preference in
+                        Text(preference.label).tag(preference)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text("Match system follows your macOS appearance setting.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
@@ -69,8 +84,16 @@ struct PreferencesView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 420)
+        .frame(width: 520, height: 520)
         .onAppear { refreshVaultDisplay() }
+    }
+
+    /// Bridges the raw-string @AppStorage to the strongly-typed enum the Picker uses.
+    private var themeBinding: Binding<EditorAppearancePreference> {
+        Binding(
+            get: { EditorAppearancePreference(rawValue: editorThemeRaw) ?? .system },
+            set: { editorThemeRaw = $0.rawValue }
+        )
     }
 
     private func pickVault() {

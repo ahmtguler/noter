@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panelController: PanelController?
     private var menuBarController: MenuBarController?
     private var onboardingController: OnboardingWindowController?
+    private var preferencesController: PreferencesWindowController?
+    private var preferencesObserver: NSObjectProtocol?
     private(set) var app: AppViewModel?
 
     func applicationDidFinishLaunching(_: Notification) {
@@ -28,14 +30,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 viewModel.editor.startBlankDraft()
             }
             panelController = controller
+            preferencesController = PreferencesWindowController(app: viewModel)
 
             menuBarController = MenuBarController(
                 onToggle: { [weak controller] in controller?.toggle() },
                 onShow: { [weak controller] in controller?.show() },
-                onShowPreferences: { PreferencesAction.open() }
+                onShowPreferences: { [weak self] in self?.showPreferences() }
             )
             KeyboardShortcuts.onKeyDown(for: .toggleNoter) { [weak controller] in
                 controller?.toggle()
+            }
+
+            preferencesObserver = NotificationCenter.default.addObserver(
+                forName: .noterShowPreferences,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.showPreferences()
+                }
             }
 
             if !UserDefaults.standard.bool(forKey: SettingsKey.didOnboard) {
@@ -48,6 +61,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_: Notification) {
         app?.editor.flush()
+        if let observer = preferencesObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+
+    func showPreferences() {
+        preferencesController?.show()
     }
 
     private func showOnboarding(app: AppViewModel, after controller: PanelController) {
