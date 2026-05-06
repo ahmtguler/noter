@@ -7,6 +7,12 @@ import SwiftUI
 /// bottom. ⌘P brings up the note switcher; ⌘N creates a new note.
 struct RootView: View {
     @ObservedObject var app: AppViewModel
+    /// Observe the EditorState directly. Without this, mutations like
+    /// `editor.body = ""` (from ⌘N → startBlankDraft) only fire
+    /// `editor.objectWillChange` — which `app` doesn't propagate, so
+    /// RootView's body never re-evaluates and the WKWebView keeps showing
+    /// the old text until some other state change forces a redraw.
+    @ObservedObject var editor: EditorState
     @State private var showSwitcher = false
     @State private var showCommandPalette = false
     @StateObject private var commandsHolder = CommandsHolder()
@@ -19,12 +25,17 @@ struct RootView: View {
     private var editorFontSizeRaw = SettingsKey.defaultEditorFontSize
     @Environment(\.colorScheme) private var systemColorScheme
 
+    init(app: AppViewModel) {
+        self.app = app
+        _editor = ObservedObject(wrappedValue: app.editor)
+    }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(spacing: 0) {
                 titleBar
                 MarkdownEditor(
-                    text: $app.editor.body,
+                    text: $editor.body,
                     configuration: editorConfiguration
                 ) { commands in
                     commandsHolder.commands = commands
@@ -47,7 +58,7 @@ struct RootView: View {
                         .onTapGesture { showSwitcher = false }
                     SwitcherOverlay(
                         store: app.store,
-                        editor: app.editor,
+                        editor: editor,
                         isShowing: $showSwitcher
                     )
                 }
@@ -61,7 +72,7 @@ struct RootView: View {
                         .onTapGesture { showCommandPalette = false }
                     CommandPaletteOverlay(
                         store: app.store,
-                        editor: app.editor,
+                        editor: editor,
                         isShowing: $showCommandPalette,
                         onShowSwitcher: { showSwitcher = true },
                         onShowPreferences: {
@@ -254,10 +265,10 @@ struct RootView: View {
     }
 
     private var currentTitle: String {
-        if let note = app.editor.currentNote {
+        if let note = editor.currentNote {
             return note.title
         }
-        let derived = Slugify.title(from: app.editor.body)
+        let derived = Slugify.title(from: editor.body)
         return derived.isEmpty ? "New note" : derived
     }
 
@@ -301,16 +312,16 @@ struct RootView: View {
     }
 
     private func ensureAnOpenNote() {
-        if app.editor.currentNote != nil || !app.editor.body.isEmpty { return }
+        if editor.currentNote != nil || !editor.body.isEmpty { return }
         if let first = app.store.notes.first {
-            app.editor.open(first)
+            editor.open(first)
         } else {
-            app.editor.startBlankDraft()
+            editor.startBlankDraft()
         }
     }
 
     private func createAndOpenNewNote() {
-        app.editor.startBlankDraft()
+        editor.startBlankDraft()
     }
 }
 
