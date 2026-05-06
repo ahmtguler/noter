@@ -100,7 +100,15 @@ struct RootView: View {
             showCommandPalette = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .noterNewNote)) { _ in
+            // Dismiss any floating overlay so the new note actually appears
+            // in front; otherwise the palette would stay covering the editor.
+            showCommandPalette = false
+            showSwitcher = false
             createAndOpenNewNote()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .noterShowPreferences)) { _ in
+            showCommandPalette = false
+            showSwitcher = false
         }
         // .noterShowPreferences is handled by AppDelegate via its
         // PreferencesWindowController — no observer needed here.

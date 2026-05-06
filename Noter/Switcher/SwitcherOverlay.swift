@@ -233,19 +233,3 @@ private struct RowIconButton: View {
         return .clear
     }
 }
-
-/// Bridges into AppKit just to get a reliable native tooltip. SwiftUI's
-/// `.help()` doesn't surface on borderless rows here.
-private struct NativeTooltip: NSViewRepresentable {
-    let text: String
-
-    func makeNSView(context _: Context) -> NSView {
-        let view = NSView()
-        view.toolTip = text
-        return view
-    }
-
-    func updateNSView(_ nsView: NSView, context _: Context) {
-        nsView.toolTip = text
-    }
-}
