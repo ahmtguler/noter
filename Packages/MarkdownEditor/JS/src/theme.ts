@@ -8,7 +8,7 @@ import { tags } from "@lezer/highlight";
 
 export type EditorAppearance = "light" | "dark";
 
-export function buildTheme(appearance: EditorAppearance): Extension {
+export function buildTheme(appearance: EditorAppearance, fontSize: number = 14): Extension {
     const isDark = appearance === "dark";
     const text = isDark ? "#f5f5f7" : "#1d1d1f";
     const secondary = isDark ? "rgba(245,245,247,0.55)" : "rgba(29,29,31,0.55)";
@@ -26,7 +26,7 @@ export function buildTheme(appearance: EditorAppearance): Extension {
                 backgroundColor: "transparent",
                 height: "100%",
                 fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
-                fontSize: "14px",
+                fontSize: `${fontSize}px`,
             },
             ".cm-content": {
                 caretColor: text,
@@ -52,29 +52,25 @@ export function buildTheme(appearance: EditorAppearance): Extension {
             ".cm-editor": { paddingRight: "4px" },
             ".cm-line": { padding: "0" },
             ".cm-link": { color: accent, textDecoration: "none" },
+            ".cm-html-underline": { textDecoration: "underline" },
             ".cm-bullet-widget": { color: accent, fontWeight: "700", marginRight: "0px" },
             ".cm-numbered-marker": { color: accent, fontWeight: "600" },
             ".cm-task-checkbox": {
                 display: "inline-block",
+                boxSizing: "border-box",
                 width: "14px",
                 height: "14px",
                 border: `1.5px solid ${secondary}`,
                 borderRadius: "3px",
-                textAlign: "center",
-                lineHeight: "11px",
-                fontSize: "10px",
-                fontWeight: "700",
                 cursor: "pointer",
                 marginRight: "6px",
                 userSelect: "none",
                 verticalAlign: "-2px",
-                color: "transparent",
                 transition: "background-color 0.1s, border-color 0.1s",
             },
             ".cm-task-checkbox-checked": {
                 backgroundColor: accent,
                 borderColor: accent,
-                color: "white",
             },
             // Subtle scrollbar that hugs the right edge and dims when not hovered.
             ".cm-scroller::-webkit-scrollbar": {

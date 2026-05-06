@@ -72,6 +72,7 @@ function bootstrap() {
     }
 
     const initialAppearance = systemAppearance();
+    const initialFontSize = 16;
 
     const updateListener = EditorView.updateListener.of((update) => {
         if (update.docChanged) {
@@ -106,7 +107,7 @@ function bootstrap() {
             todoBracketAutoComplete,
             keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
             wrapCompartment.of(EditorView.lineWrapping),
-            themeCompartment.of(buildTheme(initialAppearance)),
+            themeCompartment.of(buildTheme(initialAppearance, initialFontSize)),
             fontCompartment.of(EditorView.theme({})),
             updateListener,
         ],
@@ -138,14 +139,7 @@ function bootstrap() {
             const appearance = config.theme === "system" ? systemAppearance() : config.theme;
             view.dispatch({
                 effects: [
-                    themeCompartment.reconfigure(buildTheme(appearance)),
-                    fontCompartment.reconfigure(
-                        EditorView.theme({
-                            "&": {
-                                fontSize: `${config.fontSize}px`,
-                            },
-                        })
-                    ),
+                    themeCompartment.reconfigure(buildTheme(appearance, config.fontSize)),
                     wrapCompartment.reconfigure(
                         config.lineWrap ? EditorView.lineWrapping : []
                     ),
