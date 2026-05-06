@@ -65,7 +65,6 @@ struct CommandPaletteOverlay: View {
                     }
                     .padding(.vertical, 6)
                 }
-                .background(ArrowCursorArea())
                 .onChange(of: selectedIndex) { _, new in
                     proxy.scrollTo(new, anchor: .center)
                 }
@@ -78,6 +77,11 @@ struct CommandPaletteOverlay: View {
             ))
         }
         .frame(width: 380, height: contentHeight)
+        // Arrow-cursor rect on the outer frame so the I-beam from any inner
+        // text-input doesn't leak past its own bounds. Scoped narrower
+        // (.background on the ScrollView only) didn't work — SwiftUI's
+        // hosting layout absorbed the rect lookup before AppKit got it.
+        .background(ArrowCursorArea())
         .background(
             // hudWindow is a more aggressive blur with stronger transparency
             // than .popover — the palette feels "floaty" rather than solid.
@@ -398,9 +402,14 @@ private struct CommandRow: View {
                     .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 4))
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(isSelected ? Color.accentColor.opacity(0.18) : .clear)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? Color.accentColor.opacity(0.22) : Color.clear)
+        )
+        .padding(.horizontal, 6)
+        .padding(.vertical, 1)
         .opacity(command.isEnabled ? 1.0 : 0.5)
     }
 
@@ -415,78 +424,5 @@ private struct CommandRow: View {
             return AnyShapeStyle(Color.red)
         }
         return AnyShapeStyle(HierarchicalShapeStyle.primary)
-    }
-}
-
-private struct TrashRow: View {
-    let note: Note
-    let isSelected: Bool
-    let onRestore: () -> Void
-    let onPurge: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(note.title)
-                    .font(.body.weight(.medium))
-                    .lineLimit(1)
-                Text("Deleted \(RelativeTime.string(from: note.modifiedAt))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer()
-            TrashIconButton(
-                systemName: "arrow.uturn.backward",
-                tooltip: "Restore",
-                tint: .accentColor,
-                action: onRestore
-            )
-            TrashIconButton(
-                systemName: "trash",
-                tooltip: "Delete permanently",
-                tint: .red,
-                action: onPurge
-            )
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(isSelected ? Color.accentColor.opacity(0.18) : .clear)
-    }
-}
-
-private struct TrashIconButton: View {
-    let systemName: String
-    let tooltip: String
-    let tint: Color
-    let action: () -> Void
-
-    @State private var isHovering = false
-    @State private var isPressed = false
-
-    var body: some View {
-        Image(systemName: systemName)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(tint)
-            .frame(width: 24, height: 24)
-            .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .contentShape(Rectangle())
-            .onHover { isHovering = $0 }
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in isPressed = true }
-                    .onEnded { _ in
-                        if isPressed { action() }
-                        isPressed = false
-                    }
-            )
-            .background(NativeTooltip(text: tooltip))
-    }
-
-    private var background: Color {
-        if isPressed { return Color.primary.opacity(0.15) }
-        if isHovering { return Color.primary.opacity(0.08) }
-        return .clear
     }
 }
