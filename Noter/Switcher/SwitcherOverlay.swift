@@ -51,9 +51,9 @@ struct SwitcherOverlay: View {
                 }
             }
         }
-        .frame(width: 420, height: 360)
+        .frame(width: 380, height: 360)
         .background(
-            VisualEffectBackground(material: .popover, blendingMode: .withinWindow)
+            VisualEffectBackground(material: .hudWindow, blendingMode: .withinWindow)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(

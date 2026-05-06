@@ -77,9 +77,11 @@ struct CommandPaletteOverlay: View {
                 onCancel: cancelOrBack
             ))
         }
-        .frame(width: 420, height: contentHeight)
+        .frame(width: 380, height: contentHeight)
         .background(
-            VisualEffectBackground(material: .popover, blendingMode: .withinWindow)
+            // hudWindow is a more aggressive blur with stronger transparency
+            // than .popover — the palette feels "floaty" rather than solid.
+            VisualEffectBackground(material: .hudWindow, blendingMode: .withinWindow)
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .overlay(
@@ -94,8 +96,10 @@ struct CommandPaletteOverlay: View {
         case .commands:
             return min(CGFloat(allCommands.count) * 52 + 12, 380)
         case .trash:
-            let rows = max(trashedSnapshot.count, 1)
-            return min(CGFloat(rows) * 52 + 60, 420)
+            // Empty state needs room for the icon + label so it isn't clipped.
+            // Floor at 220pt; otherwise scale with row count up to a 420pt cap.
+            if trashedSnapshot.isEmpty { return 220 }
+            return min(CGFloat(trashedSnapshot.count) * 52 + 70, 420)
         }
     }
 
