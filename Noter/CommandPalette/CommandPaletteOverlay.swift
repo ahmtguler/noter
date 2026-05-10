@@ -107,12 +107,10 @@ struct CommandPaletteOverlay: View {
                 .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
-        // Re-set arrow on every hover frame. push/pop wasn't enough — the
-        // WKWebView CodeMirror beneath kept calling NSCursor.IBeam.set()
-        // on its own mouseMoved and silently overrode the pushed cursor.
-        .onContinuousHover { phase in
-            if case .active = phase { NSCursor.arrow.set() }
-        }
+        // Heartbeat-based cursor enforcement — see CursorEnforcer notes.
+        // Mouse-move-only approaches lose the cursor when the mouse rests
+        // because WebKit's NSCursor.IBeam.set() is last-write-wins.
+        .cursorEnforced(.arrow)
     }
 
     private var contentHeight: CGFloat {
