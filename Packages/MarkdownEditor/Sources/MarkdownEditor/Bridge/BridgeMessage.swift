@@ -7,6 +7,15 @@ enum InboundMessage: Decodable {
     case selectionChanged(styles: Set<MarkdownStyle>)
     case logging(level: String, message: String)
     case openURL(url: String)
+    /// Hover landed on an existing link long enough to show the inspect
+    /// popover (Copy / Edit). `range` is the doc range of the entire link
+    /// (`[text](url)`); `rect` is the bounds of the visible text in
+    /// WKWebView coords.
+    case linkInspect(payload: LinkInspectPayload)
+    /// User pressed the Link toolbar button with a non-empty selection.
+    /// `range` is the selection in the doc; `rect` is the selection's bounds
+    /// in WKWebView coords (so the popover can anchor there).
+    case linkCreateRequest(payload: LinkCreatePayload)
 
     enum CodingKeys: String, CodingKey {
         case kind
@@ -15,6 +24,9 @@ enum InboundMessage: Decodable {
         case level
         case message
         case url
+        case from
+        case to
+        case rect
     }
 
     init(from decoder: Decoder) throws {
@@ -34,6 +46,10 @@ enum InboundMessage: Decodable {
             )
         case "openURL":
             self = try .openURL(url: container.decode(String.self, forKey: .url))
+        case "linkInspect":
+            self = try .linkInspect(payload: LinkInspectPayload(from: decoder))
+        case "linkCreateRequest":
+            self = try .linkCreateRequest(payload: LinkCreatePayload(from: decoder))
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .kind,
@@ -42,6 +58,26 @@ enum InboundMessage: Decodable {
             )
         }
     }
+}
+
+struct ViewportRect: Decodable, Equatable {
+    let x: Double
+    let y: Double
+    let width: Double
+    let height: Double
+}
+
+struct LinkInspectPayload: Decodable, Equatable {
+    let url: String
+    let from: Int
+    let to: Int
+    let rect: ViewportRect
+}
+
+struct LinkCreatePayload: Decodable, Equatable {
+    let from: Int
+    let to: Int
+    let rect: ViewportRect
 }
 
 /// Messages Swift sends to JS. Encoded as JSON and applied via `evaluateJavaScript`.
@@ -87,4 +123,10 @@ enum BridgeCommand: String {
     case quote
     case link
     case focus
+    /// Apply / replace a link on a doc range. `arg` is JSON
+    /// `{"from": Int, "to": Int, "url": String}`.
+    case linkApply
+    /// Remove a link, leaving the text in place. `arg` is JSON
+    /// `{"from": Int, "to": Int}` covering the existing link.
+    case linkRemove
 }

@@ -18,7 +18,7 @@ import { applyCommand } from "./commands";
 import { detectActiveStyles } from "./detectStyles";
 import { todoBracketAutoComplete } from "./inputHandlers";
 import { livePreviewPlugin, taskCheckboxClickHandler } from "./livePreview";
-import { makeLinkClickHandler } from "./linkInteractions";
+import { makeLinkInteractions } from "./linkInteractions";
 import { buildTheme, EditorAppearance } from "./theme";
 
 declare global {
@@ -105,7 +105,7 @@ function bootstrap() {
             // weight rules we need.
             livePreviewPlugin,
             taskCheckboxClickHandler,
-            makeLinkClickHandler(postToSwift),
+            makeLinkInteractions(postToSwift),
             todoBracketAutoComplete,
             keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
             wrapCompartment.of(EditorView.lineWrapping),
@@ -133,7 +133,7 @@ function bootstrap() {
         },
         exec(command: string, arg: string | null) {
             if (!view) return;
-            applyCommand(view, command, arg);
+            applyCommand(view, command, arg, postToSwift);
             view.focus();
         },
         applyConfig(config: EditorConfig) {

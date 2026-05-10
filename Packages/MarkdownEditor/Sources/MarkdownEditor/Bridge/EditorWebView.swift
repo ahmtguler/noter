@@ -66,6 +66,7 @@ struct EditorWebView: NSViewRepresentable {
     final class Coordinator: NSObject {
         private let bridge = EditorBridge()
         private let commands = MarkdownCommands()
+        private var linkPopover: LinkPopoverController?
         private var lastSentConfig: EditorConfiguration?
         private var lastSentText: String?
         private var didNotifyReady = false
@@ -92,6 +93,17 @@ struct EditorWebView: NSViewRepresentable {
                 self?.handleSelectionChanged(styles)
             }
             bridge.onOpenURL = { [weak self] url in self?.onOpenURL?(url) }
+            bridge.onLinkInspect = { [weak self] payload in
+                self?.linkPopover?.presentInspect(payload: payload)
+            }
+            bridge.onLinkCreateRequest = { [weak self] payload in
+                self?.linkPopover?.presentEdit(
+                    initialURL: "",
+                    range: payload.from ... payload.to,
+                    rect: payload.rect,
+                    mode: .createNew
+                )
+            }
             bridge.onLog = { level, message in
                 NSLog("[MarkdownEditor JS][\(level)] \(message)")
             }
@@ -99,6 +111,7 @@ struct EditorWebView: NSViewRepresentable {
 
         func attach(to webView: WKWebView) {
             bridge.attach(to: webView)
+            linkPopover = LinkPopoverController(webView: webView, bridge: bridge)
         }
 
         func detach() {
