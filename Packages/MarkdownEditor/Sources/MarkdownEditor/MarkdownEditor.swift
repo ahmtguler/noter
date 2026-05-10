@@ -15,6 +15,11 @@ public struct MarkdownEditor: View {
     /// navigates itself.
     public var onOpenURL: ((String) -> Void)?
 
+    /// Drives the in-editor link popover. Owned by the package so the popover
+    /// stays inside this view's bounds and never escapes into a separate
+    /// AppKit window.
+    @StateObject private var linkState = LinkPopoverState()
+
     public init(
         text: Binding<String>,
         configuration: EditorConfiguration = .default,
@@ -32,7 +37,9 @@ public struct MarkdownEditor: View {
             text: $text,
             configuration: configuration,
             onCommandsReady: onCommandsReady,
-            onOpenURL: onOpenURL
+            onOpenURL: onOpenURL,
+            linkState: linkState
         )
+        .overlay(LinkPopoverOverlay(state: linkState))
     }
 }

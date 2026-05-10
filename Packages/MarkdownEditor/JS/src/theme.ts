@@ -51,7 +51,7 @@ export function buildTheme(appearance: EditorAppearance, fontSize: number = 14):
             // the panel's right edge instead of touching it.
             ".cm-editor": { paddingRight: "4px" },
             ".cm-line": { padding: "0" },
-            ".cm-link": { color: accent, textDecoration: "none" },
+            ".cm-link": { color: accent, textDecoration: "none", cursor: "pointer" },
             ".cm-html-underline": { textDecoration: "underline" },
             ".cm-bullet-widget": { color: accent, fontWeight: "700", marginRight: "0px" },
             ".cm-numbered-marker": { color: accent, fontWeight: "600" },

@@ -11,6 +11,7 @@ struct EditorWebView: NSViewRepresentable {
     var configuration: EditorConfiguration
     var onCommandsReady: ((MarkdownCommands) -> Void)?
     var onOpenURL: ((String) -> Void)?
+    var linkState: LinkPopoverState
 
     func makeNSView(context: Context) -> WKWebView {
         let webConfig = WKWebViewConfiguration()
@@ -40,7 +41,8 @@ struct EditorWebView: NSViewRepresentable {
             text: $text,
             configuration: configuration,
             onCommandsReady: onCommandsReady,
-            onOpenURL: onOpenURL
+            onOpenURL: onOpenURL,
+            linkState: linkState
         )
     }
 
@@ -66,7 +68,7 @@ struct EditorWebView: NSViewRepresentable {
     final class Coordinator: NSObject {
         private let bridge = EditorBridge()
         private let commands = MarkdownCommands()
-        private var linkPopover: LinkPopoverController?
+        private let linkState: LinkPopoverState
         private var lastSentConfig: EditorConfiguration?
         private var lastSentText: String?
         private var didNotifyReady = false
@@ -79,14 +81,24 @@ struct EditorWebView: NSViewRepresentable {
             text: Binding<String>,
             configuration: EditorConfiguration,
             onCommandsReady: ((MarkdownCommands) -> Void)?,
-            onOpenURL: ((String) -> Void)?
+            onOpenURL: ((String) -> Void)?,
+            linkState: LinkPopoverState
         ) {
             textBinding = text
             self.configuration = configuration
             self.onCommandsReady = onCommandsReady
             self.onOpenURL = onOpenURL
+            self.linkState = linkState
             super.init()
             commands.bridge = bridge
+            linkState.onApplyLink = { [weak bridge] from, to, url in
+                let arg = #"{"from":\#(from),"to":\#(to),"url":\#(jsonEscape(url))}"#
+                bridge?.send(.execute(command: .linkApply, arg: arg))
+            }
+            linkState.onRemoveLink = { [weak bridge] from, to in
+                let arg = #"{"from":\#(from),"to":\#(to)}"#
+                bridge?.send(.execute(command: .linkRemove, arg: arg))
+            }
             bridge.onReady = { [weak self] in self?.handleReady() }
             bridge.onTextChanged = { [weak self] text in self?.handleTextChanged(text) }
             bridge.onSelectionChanged = { [weak self] styles in
@@ -94,14 +106,14 @@ struct EditorWebView: NSViewRepresentable {
             }
             bridge.onOpenURL = { [weak self] url in self?.onOpenURL?(url) }
             bridge.onLinkInspect = { [weak self] payload in
-                self?.linkPopover?.presentInspect(payload: payload)
+                self?.linkState.presentInspect(payload)
             }
             bridge.onLinkCreateRequest = { [weak self] payload in
-                self?.linkPopover?.presentEdit(
+                self?.linkState.presentEdit(
                     initialURL: "",
                     range: payload.from ... payload.to,
                     rect: payload.rect,
-                    mode: .createNew
+                    kind: .createNew
                 )
             }
             bridge.onLog = { level, message in
@@ -111,7 +123,6 @@ struct EditorWebView: NSViewRepresentable {
 
         func attach(to webView: WKWebView) {
             bridge.attach(to: webView)
-            linkPopover = LinkPopoverController(webView: webView, bridge: bridge)
         }
 
         func detach() {
@@ -176,4 +187,11 @@ private final class TransparentWebView: WKWebView {
     override var isOpaque: Bool {
         false
     }
+}
+
+/// JSON-encodes a string into a JS string literal (with surrounding quotes)
+/// so it survives concatenation into a JSON arg.
+private func jsonEscape(_ value: String) -> String {
+    let data = (try? JSONEncoder().encode(value)) ?? Data("\"\"".utf8)
+    return String(data: data, encoding: .utf8) ?? "\"\""
 }
