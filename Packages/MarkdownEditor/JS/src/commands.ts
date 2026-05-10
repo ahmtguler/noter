@@ -30,7 +30,14 @@ const linePrefixes: Record<string, string> = {
     quote: "> ",
 };
 
-export function applyCommand(view: EditorView, command: string, arg: string | null) {
+export type PostFn = (msg: object) => void;
+
+export function applyCommand(
+    view: EditorView,
+    command: string,
+    arg: string | null,
+    post: PostFn
+) {
     if (command === "focus") {
         view.focus();
         return;
@@ -41,7 +48,15 @@ export function applyCommand(view: EditorView, command: string, arg: string | nu
         return;
     }
     if (command === "link") {
-        applyLink(view);
+        requestLinkPopover(view, post);
+        return;
+    }
+    if (command === "linkApply") {
+        applyLinkPayload(view, arg);
+        return;
+    }
+    if (command === "linkRemove") {
+        removeLinkPayload(view, arg);
         return;
     }
     if (command === "codeBlock") {
@@ -338,22 +353,89 @@ function applyCodeBlock(view: EditorView) {
 
 // MARK: - Link
 
-function applyLink(view: EditorView) {
+function requestLinkPopover(view: EditorView, post: PostFn) {
     const state = view.state;
     const sel = state.selection.main;
     if (sel.empty) {
-        // Link insertion requires text to wrap. Without a selection there's
-        // nothing meaningful to label the link with — keep the editor untouched
-        // and let the host prompt the user to select first.
+        // No selection → no link. The host doesn't even open the popover —
+        // user has to select something first.
         return;
     }
-    const sliced = state.doc.sliceString(sel.from, sel.to);
-    const placeholder = "url";
-    const replacement = `[${sliced}](${placeholder})`;
-    const urlStart = sel.from + 1 + sliced.length + 2; // after "[selected]("
+    const start = view.coordsAtPos(sel.from, 1);
+    const end = view.coordsAtPos(sel.to, -1);
+    if (!start || !end) return;
+    const x = Math.min(start.left, end.left);
+    const right = Math.max(start.right, end.right);
+    const y = Math.min(start.top, end.top);
+    const bottom = Math.max(start.bottom, end.bottom);
+    post({
+        kind: "linkCreateRequest",
+        from: sel.from,
+        to: sel.to,
+        rect: { x, y, width: right - x, height: bottom - y },
+    });
+}
+
+interface LinkApplyPayload {
+    from: number;
+    to: number;
+    url: string;
+}
+
+function applyLinkPayload(view: EditorView, arg: string | null) {
+    if (!arg) return;
+    let parsed: LinkApplyPayload;
+    try {
+        parsed = JSON.parse(arg);
+    } catch {
+        return;
+    }
+    const { from, to, url } = parsed;
+    if (from < 0 || to > view.state.doc.length || from >= to) return;
+    const text = view.state.sliceDoc(from, to);
+    // If the range is already a complete link, replace just the URL portion.
+    const linkPattern = /^\[([^\]]*)\]\(([^)]*)\)$/;
+    const match = text.match(linkPattern);
+    let insert: string;
+    if (match) {
+        insert = `[${match[1]}](${url})`;
+    } else {
+        insert = `[${text}](${url})`;
+    }
     view.dispatch({
-        changes: { from: sel.from, to: sel.to, insert: replacement },
-        selection: EditorSelection.single(urlStart, urlStart + placeholder.length),
+        changes: { from, to, insert },
+        // Place caret just after the closing paren so subsequent typing is
+        // outside the link.
+        selection: EditorSelection.single(from + insert.length),
         scrollIntoView: true,
     });
+    view.focus();
+}
+
+interface LinkRemovePayload {
+    from: number;
+    to: number;
+}
+
+function removeLinkPayload(view: EditorView, arg: string | null) {
+    if (!arg) return;
+    let parsed: LinkRemovePayload;
+    try {
+        parsed = JSON.parse(arg);
+    } catch {
+        return;
+    }
+    const { from, to } = parsed;
+    if (from < 0 || to > view.state.doc.length || from >= to) return;
+    const text = view.state.sliceDoc(from, to);
+    const linkPattern = /^\[([^\]]*)\]\(([^)]*)\)$/;
+    const match = text.match(linkPattern);
+    if (!match) return;
+    const inner = match[1];
+    view.dispatch({
+        changes: { from, to, insert: inner },
+        selection: EditorSelection.single(from + inner.length),
+        scrollIntoView: true,
+    });
+    view.focus();
 }

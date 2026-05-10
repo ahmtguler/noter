@@ -25,6 +25,10 @@ final class EditorBridge: NSObject, WKScriptMessageHandler {
     /// URL with `NSWorkspace`. Keeping this on the host (not the JS side) so
     /// the WKWebView never tries to navigate itself.
     var onOpenURL: ((String) -> Void)?
+    /// Hover lingered on a link long enough to show the inspect popover.
+    var onLinkInspect: ((LinkInspectPayload) -> Void)?
+    /// Toolbar Link button pressed with a non-empty selection.
+    var onLinkCreateRequest: ((LinkCreatePayload) -> Void)?
 
     func attach(to webView: WKWebView) {
         self.webView = webView
@@ -89,6 +93,10 @@ final class EditorBridge: NSObject, WKScriptMessageHandler {
                 onLog?(level, message)
             case let .openURL(url):
                 onOpenURL?(url)
+            case let .linkInspect(payload):
+                onLinkInspect?(payload)
+            case let .linkCreateRequest(payload):
+                onLinkCreateRequest?(payload)
             }
         } catch {
             NSLog("[MarkdownEditor] failed to decode bridge message: \(error)")
