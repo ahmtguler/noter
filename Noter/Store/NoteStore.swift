@@ -244,11 +244,20 @@ final class NoteStore: ObservableObject {
     }
 
     func togglePin(_ url: URL) {
-        if pinnedPaths.contains(url.path) {
-            pinnedPaths.remove(url.path)
+        // Belt-and-suspenders: explicit `objectWillChange.send()` plus a
+        // full reassignment to a new Set value. Either alone *should* fire
+        // SwiftUI's @Published invalidation, but observed cases where
+        // mutating Set members on a `private(set) @Published` doesn't
+        // visibly redraw observers — forcing a brand-new value side-steps
+        // the issue and leaves no doubt.
+        objectWillChange.send()
+        var next = pinnedPaths
+        if next.contains(url.path) {
+            next.remove(url.path)
         } else {
-            pinnedPaths.insert(url.path)
+            next.insert(url.path)
         }
+        pinnedPaths = next
         persistPins()
     }
 

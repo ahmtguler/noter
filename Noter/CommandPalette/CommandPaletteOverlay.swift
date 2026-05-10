@@ -45,7 +45,7 @@ struct CommandPaletteOverlay: View {
                                     )
                                 }
                                 .buttonStyle(.plain)
-                                .id(index)
+                                .id(command.id)
                             }
                         case .trash:
                             if trashedSnapshot.isEmpty {
@@ -63,7 +63,7 @@ struct CommandPaletteOverlay: View {
                                         )
                                     }
                                     .buttonStyle(.plain)
-                                    .id(index)
+                                    .id(note.id)
                                 }
                             }
                         }
@@ -71,7 +71,16 @@ struct CommandPaletteOverlay: View {
                     .padding(.vertical, 6)
                 }
                 .onChange(of: selectedIndex) { _, new in
-                    proxy.scrollTo(new, anchor: .center)
+                    switch mode {
+                    case .commands:
+                        if new < allCommands.count {
+                            proxy.scrollTo(allCommands[new].id, anchor: .center)
+                        }
+                    case .trash:
+                        if new < trashedSnapshot.count {
+                            proxy.scrollTo(trashedSnapshot[new].id, anchor: .center)
+                        }
+                    }
                 }
             }
             .background(KeyCatcher(
@@ -98,10 +107,12 @@ struct CommandPaletteOverlay: View {
                 .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
-        // Push arrow cursor while the palette is up; the editor's I-beam
-        // (set by WKWebView's CodeMirror) would otherwise stay on screen.
-        .onAppear { NSCursor.arrow.push() }
-        .onDisappear { NSCursor.pop() }
+        // Re-set arrow on every hover frame. push/pop wasn't enough — the
+        // WKWebView CodeMirror beneath kept calling NSCursor.IBeam.set()
+        // on its own mouseMoved and silently overrode the pushed cursor.
+        .onContinuousHover { phase in
+            if case .active = phase { NSCursor.arrow.set() }
+        }
     }
 
     private var contentHeight: CGFloat {

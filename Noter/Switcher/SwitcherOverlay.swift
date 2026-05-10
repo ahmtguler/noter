@@ -29,12 +29,6 @@ struct SwitcherOverlay: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(Array(matches.enumerated()), id: \.element.note.id) { index, item in
-                            // Wrap the whole row in a Button so SwiftUI's
-                            // gesture system properly delegates between this
-                            // outer button and the pin/delete buttons inside
-                            // SwitcherRow. With `.onTapGesture` the inner
-                            // Button's tap was bubbling and the switcher
-                            // dismissed before pin took visible effect.
                             Button {
                                 selectedIndex = index
                                 commitSelection()
@@ -49,12 +43,18 @@ struct SwitcherOverlay: View {
                                 )
                             }
                             .buttonStyle(.plain)
-                            .id(index)
+                            // Use the note's URL as the scroll-target id —
+                            // stable across reorders. .id(index) was tearing
+                            // down rows on each pin toggle and the row state
+                            // change wasn't visible until reopen.
+                            .id(item.note.id)
                         }
                     }
                 }
                 .onChange(of: selectedIndex) { _, new in
-                    proxy.scrollTo(new, anchor: .center)
+                    if new < matches.count {
+                        proxy.scrollTo(matches[new].note.id, anchor: .center)
+                    }
                 }
             }
         }
@@ -72,12 +72,13 @@ struct SwitcherOverlay: View {
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
         .onChange(of: query) { _, _ in selectedIndex = 0 }
-        // Force the system cursor to arrow while the switcher is up. Without
-        // this, WKWebView's I-beam (set by CodeMirror's `cursor: text` on the
-        // editor content) bleeds through over the overlay since AppKit's
-        // cursor stack already has I-beam pushed.
-        .onAppear { NSCursor.arrow.push() }
-        .onDisappear { NSCursor.pop() }
+        // Re-set arrow on EVERY hover frame. push/pop alone wasn't enough:
+        // WKWebView's CodeMirror keeps calling NSCursor.IBeam.set() on its
+        // own mouseMoved, which silently overrides the pushed cursor.
+        // .set() per frame stays one step ahead.
+        .onContinuousHover { phase in
+            if case .active = phase { NSCursor.arrow.set() }
+        }
     }
 
     private var matches: [(note: Note, score: Int)] {
