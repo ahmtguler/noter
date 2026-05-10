@@ -72,13 +72,10 @@ struct SwitcherOverlay: View {
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
         .onChange(of: query) { _, _ in selectedIndex = 0 }
-        // Re-set arrow on EVERY hover frame. push/pop alone wasn't enough:
-        // WKWebView's CodeMirror keeps calling NSCursor.IBeam.set() on its
-        // own mouseMoved, which silently overrides the pushed cursor.
-        // .set() per frame stays one step ahead.
-        .onContinuousHover { phase in
-            if case .active = phase { NSCursor.arrow.set() }
-        }
+        // Heartbeat-based cursor enforcement — mouse-move-driven approaches
+        // only win while the cursor is moving; on rest, WebKit's
+        // NSCursor.IBeam.set() is last-write-wins and the I-beam returns.
+        .cursorEnforced(.arrow)
     }
 
     private var matches: [(note: Note, score: Int)] {
