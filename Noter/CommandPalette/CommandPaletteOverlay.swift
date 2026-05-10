@@ -96,14 +96,18 @@ struct CommandPaletteOverlay: View {
     }
 
     private var contentHeight: CGFloat {
+        // Per-row size includes inner vpad (16) + outer chip pad (2) + content
+        // (~31). Adds the LazyVStack's own vertical padding as the chrome term.
+        let rowHeight: CGFloat = 49
+        let listChrome: CGFloat = 12
         switch mode {
         case .commands:
-            return min(CGFloat(allCommands.count) * 52 + 12, 380)
+            return min(CGFloat(allCommands.count) * rowHeight + listChrome, 380)
         case .trash:
-            // Empty state needs room for the icon + label so it isn't clipped.
-            // Floor at 220pt; otherwise scale with row count up to a 420pt cap.
-            if trashedSnapshot.isEmpty { return 220 }
-            return min(CGFloat(trashedSnapshot.count) * 52 + 70, 420)
+            // Trash mode also has the back/header bar (~44) + a divider (1pt).
+            let trashChrome: CGFloat = listChrome + 45
+            if trashedSnapshot.isEmpty { return trashChrome + 130 }
+            return min(CGFloat(trashedSnapshot.count) * rowHeight + trashChrome, 420)
         }
     }
 

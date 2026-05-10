@@ -21,6 +21,10 @@ final class EditorBridge: NSObject, WKScriptMessageHandler {
     var onSelectionChanged: ((Set<MarkdownStyle>) -> Void)?
     /// Surfaces console-style logs from the JS side for debugging.
     var onLog: ((String, String) -> Void)?
+    /// Fires when the user clicks a link inside the editor — Swift opens the
+    /// URL with `NSWorkspace`. Keeping this on the host (not the JS side) so
+    /// the WKWebView never tries to navigate itself.
+    var onOpenURL: ((String) -> Void)?
 
     func attach(to webView: WKWebView) {
         self.webView = webView
@@ -83,6 +87,8 @@ final class EditorBridge: NSObject, WKScriptMessageHandler {
                 onSelectionChanged?(styles)
             case let .logging(level, message):
                 onLog?(level, message)
+            case let .openURL(url):
+                onOpenURL?(url)
             }
         } catch {
             NSLog("[MarkdownEditor] failed to decode bridge message: \(error)")

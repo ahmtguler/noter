@@ -10,6 +10,7 @@ struct EditorWebView: NSViewRepresentable {
     @Binding var text: String
     var configuration: EditorConfiguration
     var onCommandsReady: ((MarkdownCommands) -> Void)?
+    var onOpenURL: ((String) -> Void)?
 
     func makeNSView(context: Context) -> WKWebView {
         let webConfig = WKWebViewConfiguration()
@@ -38,7 +39,8 @@ struct EditorWebView: NSViewRepresentable {
         Coordinator(
             text: $text,
             configuration: configuration,
-            onCommandsReady: onCommandsReady
+            onCommandsReady: onCommandsReady,
+            onOpenURL: onOpenURL
         )
     }
 
@@ -70,15 +72,18 @@ struct EditorWebView: NSViewRepresentable {
         private var textBinding: Binding<String>
         private var configuration: EditorConfiguration
         private var onCommandsReady: ((MarkdownCommands) -> Void)?
+        private var onOpenURL: ((String) -> Void)?
 
         init(
             text: Binding<String>,
             configuration: EditorConfiguration,
-            onCommandsReady: ((MarkdownCommands) -> Void)?
+            onCommandsReady: ((MarkdownCommands) -> Void)?,
+            onOpenURL: ((String) -> Void)?
         ) {
             textBinding = text
             self.configuration = configuration
             self.onCommandsReady = onCommandsReady
+            self.onOpenURL = onOpenURL
             super.init()
             commands.bridge = bridge
             bridge.onReady = { [weak self] in self?.handleReady() }
@@ -86,6 +91,7 @@ struct EditorWebView: NSViewRepresentable {
             bridge.onSelectionChanged = { [weak self] styles in
                 self?.handleSelectionChanged(styles)
             }
+            bridge.onOpenURL = { [weak self] url in self?.onOpenURL?(url) }
             bridge.onLog = { level, message in
                 NSLog("[MarkdownEditor JS][\(level)] \(message)")
             }

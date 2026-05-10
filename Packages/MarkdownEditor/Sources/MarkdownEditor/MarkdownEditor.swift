@@ -10,22 +10,29 @@ public struct MarkdownEditor: View {
     @Binding public var text: String
     public var configuration: EditorConfiguration
     public var onCommandsReady: ((MarkdownCommands) -> Void)?
+    /// Called when the user clicks a link inside the editor. The host is
+    /// responsible for actually opening the URL — the WKWebView never
+    /// navigates itself.
+    public var onOpenURL: ((String) -> Void)?
 
     public init(
         text: Binding<String>,
         configuration: EditorConfiguration = .default,
-        onCommandsReady: ((MarkdownCommands) -> Void)? = nil
+        onCommandsReady: ((MarkdownCommands) -> Void)? = nil,
+        onOpenURL: ((String) -> Void)? = nil
     ) {
         _text = text
         self.configuration = configuration
         self.onCommandsReady = onCommandsReady
+        self.onOpenURL = onOpenURL
     }
 
     public var body: some View {
         EditorWebView(
             text: $text,
             configuration: configuration,
-            onCommandsReady: onCommandsReady
+            onCommandsReady: onCommandsReady,
+            onOpenURL: onOpenURL
         )
     }
 }
