@@ -6,6 +6,7 @@ enum InboundMessage: Decodable {
     case textChanged(text: String)
     case selectionChanged(styles: Set<MarkdownStyle>)
     case logging(level: String, message: String)
+    case openURL(url: String)
 
     enum CodingKeys: String, CodingKey {
         case kind
@@ -13,6 +14,7 @@ enum InboundMessage: Decodable {
         case styles
         case level
         case message
+        case url
     }
 
     init(from decoder: Decoder) throws {
@@ -30,6 +32,8 @@ enum InboundMessage: Decodable {
                 level: container.decode(String.self, forKey: .level),
                 message: container.decode(String.self, forKey: .message)
             )
+        case "openURL":
+            self = try .openURL(url: container.decode(String.self, forKey: .url))
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .kind,

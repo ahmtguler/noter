@@ -341,23 +341,14 @@ function applyCodeBlock(view: EditorView) {
 function applyLink(view: EditorView) {
     const state = view.state;
     const sel = state.selection.main;
-    const sliced = state.doc.sliceString(sel.from, sel.to);
-    const placeholder = "url";
     if (sel.empty) {
-        // Empty selection: insert `[](url)` with `url` pre-selected so the
-        // user types directly into the URL slot. After they fill it the
-        // link becomes a valid Link node and the markers + URL hide.
-        const insertion = `[](${placeholder})`;
-        const urlStart = sel.from + 3; // after "[]("
-        view.dispatch({
-            changes: { from: sel.from, to: sel.to, insert: insertion },
-            selection: EditorSelection.single(urlStart, urlStart + placeholder.length),
-            scrollIntoView: true,
-        });
+        // Link insertion requires text to wrap. Without a selection there's
+        // nothing meaningful to label the link with — keep the editor untouched
+        // and let the host prompt the user to select first.
         return;
     }
-    // Selection: wrap as `[selected](url)` and select the placeholder so the
-    // user can type the URL immediately.
+    const sliced = state.doc.sliceString(sel.from, sel.to);
+    const placeholder = "url";
     const replacement = `[${sliced}](${placeholder})`;
     const urlStart = sel.from + 1 + sliced.length + 2; // after "[selected]("
     view.dispatch({

@@ -36,10 +36,14 @@ struct RootView: View {
                 titleBar
                 MarkdownEditor(
                     text: $editor.body,
-                    configuration: editorConfiguration
-                ) { commands in
-                    commandsHolder.commands = commands
-                }
+                    configuration: editorConfiguration,
+                    onCommandsReady: { commands in
+                        commandsHolder.commands = commands
+                    },
+                    onOpenURL: { url in
+                        if let url = URL(string: url) { NSWorkspace.shared.open(url) }
+                    }
+                )
                 if showFormattingToolbar {
                     Group {
                         if let commands = commandsHolder.commands {
