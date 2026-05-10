@@ -51,7 +51,6 @@ export function buildTheme(appearance: EditorAppearance, fontSize: number = 14):
             // the panel's right edge instead of touching it.
             ".cm-editor": { paddingRight: "4px" },
             ".cm-line": { padding: "0" },
-            ".cm-link": { color: accent, textDecoration: "none", cursor: "pointer" },
             ".cm-html-underline": { textDecoration: "underline" },
             ".cm-bullet-widget": { color: accent, fontWeight: "700", marginRight: "0px" },
             ".cm-numbered-marker": { color: accent, fontWeight: "600" },
@@ -104,7 +103,12 @@ export function buildTheme(appearance: EditorAppearance, fontSize: number = 14):
         { tag: tags.strong, fontWeight: "700" },
         { tag: tags.emphasis, fontStyle: "italic" },
         { tag: tags.strikethrough, textDecoration: "line-through" },
-        { tag: tags.link, color: accent, textDecoration: "none" },
+        // `cursor: pointer` belongs on the highlight entry, not on a
+        // `.cm-link` rule in the editor theme — CodeMirror autogenerates the
+        // class names for highlight styles, so a static `.cm-link` selector
+        // never matches the visible link span. Putting cursor here means
+        // hovering the rendered text gets the pointer.
+        { tag: tags.link, color: accent, textDecoration: "none", cursor: "pointer" },
         { tag: tags.url, color: accent, textDecoration: "none" },
         {
             tag: tags.monospace,

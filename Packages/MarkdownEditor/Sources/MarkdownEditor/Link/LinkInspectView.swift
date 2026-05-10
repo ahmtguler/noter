@@ -17,12 +17,11 @@ struct LinkInspectView: View {
                 .font(.callout)
                 .lineLimit(1)
                 .truncationMode(.middle)
-                .frame(maxWidth: 260, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
             IconButton(systemName: "doc.on.doc", tooltip: "Copy", action: onCopy)
             IconButton(systemName: "pencil", tooltip: "Edit", action: onEdit)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .frame(minWidth: 220)
+        .padding(.vertical, 6)
     }
 }

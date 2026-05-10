@@ -86,8 +86,8 @@ struct LinkPopoverOverlay: View {
     /// TextField + buttons.
     private func popoverWidth(_ mode: LinkPopoverState.Mode) -> CGFloat {
         switch mode {
-        case .inspect: 360
-        case .edit: 380
+        case .inspect: 280
+        case .edit: 320
         }
     }
 
