@@ -41,7 +41,22 @@ struct RootView: View {
                         commandsHolder.commands = commands
                     },
                     onOpenURL: { url in
-                        if let url = URL(string: url) { NSWorkspace.shared.open(url) }
+                        // NSWorkspace.open returns -50 (paramErr) when the
+                        // string lacks a scheme — e.g. user wrote
+                        // "google.com" rather than "https://google.com".
+                        // Auto-prefix https:// for those, and url-encode any
+                        // raw spaces / unicode that NSURL would otherwise
+                        // refuse.
+                        let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let withScheme = trimmed.contains("://")
+                            ? trimmed
+                            : "https://" + trimmed
+                        let allowed = CharacterSet.urlQueryAllowed
+                            .union(.init(charactersIn: "#:/?&=+%"))
+                        let encoded = withScheme
+                            .addingPercentEncoding(withAllowedCharacters: allowed) ?? withScheme
+                        guard let resolved = URL(string: encoded) else { return }
+                        NSWorkspace.shared.open(resolved)
                     }
                 )
                 if showFormattingToolbar {

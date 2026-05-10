@@ -22,7 +22,7 @@ interface LinkAtPos {
     to: number;
 }
 
-const HOVER_DELAY_MS = 250;
+const HOVER_DELAY_MS = 300;
 
 export function makeLinkInteractions(post: BridgePost) {
     let hoverTimer: number | null = null;
