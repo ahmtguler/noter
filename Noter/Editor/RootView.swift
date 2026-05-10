@@ -284,11 +284,20 @@ struct RootView: View {
     }
 
     private var currentTitle: String {
-        if let note = editor.currentNote {
-            return note.title
+        let raw: String = if let note = editor.currentNote {
+            note.title
+        } else {
+            Slugify.title(from: editor.body)
         }
-        let derived = Slugify.title(from: editor.body)
-        return derived.isEmpty ? "New note" : derived
+        let display = raw.isEmpty ? "New note" : raw
+        // Hard character cap on the title bar so very long first lines
+        // don't dominate the popup chrome; SwiftUI's middle-truncation
+        // would only kick in based on rendered width and varies with
+        // window size — the user wants a stable 28-chars + ellipsis.
+        let limit = 30
+        if display.count <= limit { return display }
+        let stop = display.index(display.startIndex, offsetBy: 28)
+        return display[..<stop] + "…"
     }
 
     private var pinToggle: some View {
