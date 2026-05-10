@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// ⌘K command palette. Two modes: a flat list of actions, and a
@@ -34,31 +35,35 @@ struct CommandPaletteOverlay: View {
                         switch mode {
                         case .commands:
                             ForEach(Array(allCommands.enumerated()), id: \.element.id) { index, command in
-                                CommandRow(
-                                    command: command,
-                                    isSelected: index == selectedIndex
-                                )
-                                .id(index)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
+                                Button {
                                     selectedIndex = index
                                     commitSelection()
+                                } label: {
+                                    CommandRow(
+                                        command: command,
+                                        isSelected: index == selectedIndex
+                                    )
                                 }
+                                .buttonStyle(.plain)
+                                .id(index)
                             }
                         case .trash:
                             if trashedSnapshot.isEmpty {
                                 emptyTrashState
                             } else {
                                 ForEach(Array(trashedSnapshot.enumerated()), id: \.element.id) { index, note in
-                                    TrashRow(
-                                        note: note,
-                                        isSelected: index == selectedIndex,
-                                        onRestore: { restore(note) },
-                                        onPurge: { permanentlyDelete(note) }
-                                    )
+                                    Button {
+                                        selectedIndex = index
+                                    } label: {
+                                        TrashRow(
+                                            note: note,
+                                            isSelected: index == selectedIndex,
+                                            onRestore: { restore(note) },
+                                            onPurge: { permanentlyDelete(note) }
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
                                     .id(index)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture { selectedIndex = index }
                                 }
                             }
                         }
@@ -93,6 +98,10 @@ struct CommandPaletteOverlay: View {
                 .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
+        // Push arrow cursor while the palette is up; the editor's I-beam
+        // (set by WKWebView's CodeMirror) would otherwise stay on screen.
+        .onAppear { NSCursor.arrow.push() }
+        .onDisappear { NSCursor.pop() }
     }
 
     private var contentHeight: CGFloat {

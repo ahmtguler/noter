@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// ⌘P note switcher. Floats over the editor, lets the user fuzzy-search notes by
@@ -28,20 +29,27 @@ struct SwitcherOverlay: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(Array(matches.enumerated()), id: \.element.note.id) { index, item in
-                            SwitcherRow(
-                                note: item.note,
-                                isSelected: index == selectedIndex,
-                                isCurrent: item.note.url == editor.currentNote?.url,
-                                isPinned: store.isPinned(item.note.url),
-                                onPin: { store.togglePin(item.note.url) },
-                                onDelete: { deleteNote(item.note) }
-                            )
-                            .id(index)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
+                            // Wrap the whole row in a Button so SwiftUI's
+                            // gesture system properly delegates between this
+                            // outer button and the pin/delete buttons inside
+                            // SwitcherRow. With `.onTapGesture` the inner
+                            // Button's tap was bubbling and the switcher
+                            // dismissed before pin took visible effect.
+                            Button {
                                 selectedIndex = index
                                 commitSelection()
+                            } label: {
+                                SwitcherRow(
+                                    note: item.note,
+                                    isSelected: index == selectedIndex,
+                                    isCurrent: item.note.url == editor.currentNote?.url,
+                                    isPinned: store.isPinned(item.note.url),
+                                    onPin: { store.togglePin(item.note.url) },
+                                    onDelete: { deleteNote(item.note) }
+                                )
                             }
+                            .buttonStyle(.plain)
+                            .id(index)
                         }
                     }
                 }
@@ -64,6 +72,12 @@ struct SwitcherOverlay: View {
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
         .onChange(of: query) { _, _ in selectedIndex = 0 }
+        // Force the system cursor to arrow while the switcher is up. Without
+        // this, WKWebView's I-beam (set by CodeMirror's `cursor: text` on the
+        // editor content) bleeds through over the overlay since AppKit's
+        // cursor stack already has I-beam pushed.
+        .onAppear { NSCursor.arrow.push() }
+        .onDisappear { NSCursor.pop() }
     }
 
     private var matches: [(note: Note, score: Int)] {
