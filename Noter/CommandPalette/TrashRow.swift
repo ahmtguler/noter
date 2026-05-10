@@ -52,31 +52,19 @@ private struct TrashIconButton: View {
     let action: () -> Void
 
     @State private var isHovering = false
-    @State private var isPressed = false
 
     var body: some View {
-        Image(systemName: systemName)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(tint)
-            .frame(width: 24, height: 24)
-            .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .contentShape(Rectangle())
-            .onHover { isHovering = $0 }
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in isPressed = true }
-                    .onEnded { _ in
-                        if isPressed { action() }
-                        isPressed = false
-                    }
-            )
-            .background(NativeTooltip(text: tooltip))
-    }
-
-    private var background: Color {
-        if isPressed { return Color.primary.opacity(0.15) }
-        if isHovering { return Color.primary.opacity(0.08) }
-        return .clear
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: 24, height: 24)
+                .background(isHovering ? Color.primary.opacity(0.08) : .clear)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .background(NativeTooltip(text: tooltip))
     }
 }
