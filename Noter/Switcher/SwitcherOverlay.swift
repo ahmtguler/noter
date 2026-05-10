@@ -200,10 +200,11 @@ struct SwitcherRow: View {
     }
 }
 
-/// Hover/press-aware icon button with a tooltip. SwiftUI's `.help()` on
-/// borderless buttons is unreliable in macOS 26 popups, so we apply the
-/// tooltip to the underlying NSView and render hover/press feedback
-/// ourselves with a tinted background.
+/// Hover-aware icon button with a tooltip. Wrapped in a SwiftUI Button so
+/// the click is consumed and doesn't bubble up to the row's outer
+/// `.onTapGesture` — without this the row's commit-selection handler ran
+/// in the same tick, closing the switcher before the user could see the
+/// pin/delete take effect.
 private struct RowIconButton: View {
     let systemName: String
     let tooltip: String
@@ -211,32 +212,20 @@ private struct RowIconButton: View {
     let action: () -> Void
 
     @State private var isHovering = false
-    @State private var isPressed = false
 
     var body: some View {
-        Image(systemName: systemName)
-            .font(.system(size: 12, weight: .medium))
-            .foregroundStyle(tint.map { AnyShapeStyle($0) }
-                ?? AnyShapeStyle(HierarchicalShapeStyle.secondary))
-            .frame(width: 24, height: 24)
-            .background(background)
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            .contentShape(Rectangle())
-            .onHover { isHovering = $0 }
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in isPressed = true }
-                    .onEnded { _ in
-                        if isPressed { action() }
-                        isPressed = false
-                    }
-            )
-            .background(NativeTooltip(text: tooltip))
-    }
-
-    private var background: Color {
-        if isPressed { return Color.primary.opacity(0.15) }
-        if isHovering { return Color.primary.opacity(0.08) }
-        return .clear
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(tint.map { AnyShapeStyle($0) }
+                    ?? AnyShapeStyle(HierarchicalShapeStyle.secondary))
+                .frame(width: 24, height: 24)
+                .background(isHovering ? Color.primary.opacity(0.08) : .clear)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
+        .background(NativeTooltip(text: tooltip))
     }
 }
