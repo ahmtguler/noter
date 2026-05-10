@@ -28,8 +28,26 @@ struct LinkEditView: View {
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
             TextField("https://", text: $url)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 260)
+                // .roundedBorder draws a heavy 3pt focus ring that drowns
+                // out the popover's chrome; .plain + a custom 1pt border
+                // matches the rest of the app's restraint.
+                .textFieldStyle(.plain)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color.primary.opacity(0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(
+                            fieldFocused
+                                ? Color.accentColor.opacity(0.55)
+                                : Color.primary.opacity(0.18),
+                            lineWidth: 1
+                        )
+                )
+                .frame(maxWidth: .infinity)
                 .focused($fieldFocused)
                 .onSubmit { onCommit(url) }
             IconButton(systemName: "checkmark", tooltip: "Confirm", action: { onCommit(url) })
@@ -42,8 +60,7 @@ struct LinkEditView: View {
             )
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .frame(minWidth: 320)
+        .padding(.vertical, 6)
         .onAppear { fieldFocused = true }
     }
 }
