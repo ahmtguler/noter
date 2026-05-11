@@ -107,10 +107,6 @@ struct CommandPaletteOverlay: View {
                 .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
-        // Same approach as the switcher — once-on-appear snap to arrow,
-        // with the editor below made hit-test-transparent so WebKit never
-        // re-sets the cursor.
-        .onAppear { NSCursor.arrow.set() }
     }
 
     private var contentHeight: CGFloat {
