@@ -107,10 +107,10 @@ struct CommandPaletteOverlay: View {
                 .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
-        // Heartbeat-based cursor enforcement — see CursorEnforcer notes.
-        // Mouse-move-only approaches lose the cursor when the mouse rests
-        // because WebKit's NSCursor.IBeam.set() is last-write-wins.
-        .cursorEnforced(.arrow)
+        // Same approach as the switcher — once-on-appear snap to arrow,
+        // with the editor below made hit-test-transparent so WebKit never
+        // re-sets the cursor.
+        .onAppear { NSCursor.arrow.set() }
     }
 
     private var contentHeight: CGFloat {
