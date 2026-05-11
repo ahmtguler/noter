@@ -72,10 +72,6 @@ struct SwitcherOverlay: View {
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
         .onChange(of: query) { _, _ in selectedIndex = 0 }
-        // Snap to arrow once on appear. The editor underneath is made
-        // hit-test-transparent by RootView while we're shown, so WebKit
-        // never gets the mouseMoved events that would re-set I-beam.
-        .onAppear { NSCursor.arrow.set() }
     }
 
     private var matches: [(note: Note, score: Int)] {
