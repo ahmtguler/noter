@@ -59,6 +59,13 @@ struct RootView: View {
                         NSWorkspace.shared.open(resolved)
                     }
                 )
+                // While an overlay is shown, hand-off all mouse events: with
+                // hit-testing disabled on the WKWebView, WebKit doesn't get
+                // mouseMoved / mouseEntered, so it never calls
+                // NSCursor.IBeam.set() on its own (CodeMirror's `cursor: text`
+                // plus caret blink). The overlay's onAppear snaps the cursor
+                // to arrow and nothing fights it after that.
+                .allowsHitTesting(!showSwitcher && !showCommandPalette)
                 if showFormattingToolbar {
                     Group {
                         if let commands = commandsHolder.commands {
