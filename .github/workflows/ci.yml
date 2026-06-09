@@ -9,17 +9,19 @@ on:
 jobs:
   ci:
     name: Lint, test, build
-    runs-on: macos-14
+    # macos-26's default Xcode (26.4.1) matches local dev. No explicit
+    # xcode-select: pinning an exact /Applications path breaks whenever the
+    # image rotates versions — that's how the old macos-14 + Xcode 15.4 pin
+    # rotted (xcodegen emits project format 77, which needs Xcode 16+, and
+    # the Swift Testing suites need Xcode 16+ anyway).
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
-
+      # swiftlint / swiftformat / xcbeautify ship preinstalled on the image;
+      # only xcodegen is missing.
       - name: Install tools
-        run: |
-          brew update
-          brew install swiftlint swiftformat xcbeautify xcodegen
+        run: brew install xcodegen
 
       - name: Cache DerivedData
         uses: actions/cache@v4
