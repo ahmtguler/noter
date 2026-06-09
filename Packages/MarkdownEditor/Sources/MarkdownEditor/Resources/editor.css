@@ -25,6 +25,17 @@ body {
     background: transparent;
 }
 
+/* When an app overlay (⌘P switcher / ⌘K palette) covers the editor, the
+   WKWebView keeps reporting CodeMirror's `cursor: text` (I-beam) for the area
+   under the pointer. That fights the overlay's arrow cursor and flickers,
+   because WebKit applies the cursor via async IPC the host can't out-race.
+   Toggling this class makes the web content itself report the default arrow,
+   so there's nothing left to fight. Removed when the overlay dismisses. */
+html.noter-cursor-suppressed,
+html.noter-cursor-suppressed * {
+    cursor: default !important;
+}
+
 /* Subtle scrollbar — hugs the right edge, fades in on hover. */
 .cm-scroller::-webkit-scrollbar {
     width: 6px;

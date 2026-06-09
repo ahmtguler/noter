@@ -64,8 +64,9 @@ struct SwitcherOverlay: View {
             }
         }
         .frame(width: 380, height: 360)
-        // Arrow-cursor rect on the outer frame so it covers the row area;
-        // SearchField still owns its own I-beam rect inside its bounds.
+        // Arrow cursor over the whole panel, *including* the search field —
+        // the field's editor is neutered (ArrowCursorFieldEditor) so it can't
+        // re-assert the I-beam and flicker against this claim. See SearchField.
         .background(ArrowCursorArea())
         .background(
             VisualEffectBackground(material: .hudWindow, blendingMode: .withinWindow)
@@ -77,16 +78,11 @@ struct SwitcherOverlay: View {
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
         .onChange(of: query) { _, _ in selectedIndex = 0 }
-        // Every mouseMoved that lands on the panel: schedule arrow set on
-        // the NEXT run-loop tick. WebKit's WKContentView sets its I-beam
-        // synchronously inside the same mouseMoved dispatch — by deferring
-        // ours with `async`, we land *after* WebKit and the arrow wins.
-        // Events still pass through, so row .onHover keeps working.
-        .onContinuousHover { phase in
-            if case .active = phase {
-                DispatchQueue.main.async { NSCursor.arrow.set() }
-            }
-        }
+        // The arrow cursor over this panel is owned two ways: ArrowCursorArea
+        // wins the per-event cursorUpdate by z-order, and RootView tells the
+        // editor to suppress its own I-beam while an overlay is up (so the
+        // WKWebView underneath stops asserting it). No run-loop-deferred
+        // NSCursor.set race is needed anymore.
         // ⇧⌘⌫ deletes the highlighted row. PanelKeyMonitor intercepts the
         // chord before SearchField sees it, so it arrives as a notification.
         .onReceive(NotificationCenter.default.publisher(for: .noterDeleteActiveNote)) { _ in

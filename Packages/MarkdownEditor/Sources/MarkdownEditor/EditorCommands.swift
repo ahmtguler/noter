@@ -68,6 +68,15 @@ public final class MarkdownCommands: ObservableObject {
         exec(.focus)
     }
 
+    /// Suppress (or restore) the editor's text cursor. Call with `true` while a
+    /// host overlay covers the editor: the web content then reports the default
+    /// arrow instead of an I-beam, so the WKWebView no longer fights the
+    /// overlay's cursor. Sent outside `exec` so it never steals first responder
+    /// from the overlay. Pair every `true` with a `false` on dismissal.
+    public func setCursorSuppressed(_ suppressed: Bool) {
+        bridge?.send(.setCursorSuppressed(suppressed))
+    }
+
     private func exec(_ command: BridgeCommand, arg: String? = nil) {
         bridge?.send(.execute(command: command, arg: arg))
     }

@@ -12,7 +12,7 @@ struct SearchField: NSViewRepresentable {
     var onCancel: () -> Void
 
     func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField()
+        let field = SwitcherSearchTextField()
         field.placeholderString = "Search notes…"
         field.isBordered = false
         field.drawsBackground = false
@@ -39,6 +39,16 @@ struct SearchField: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
+    }
+
+    /// Marker subclass so `PanelController.windowWillReturnFieldEditor` can
+    /// hand this field — and only this field — the arrow-cursor field editor.
+    /// Its own cursor rect is also forced to arrow so the brief unfocused
+    /// state can't flash an I-beam either.
+    final class SwitcherSearchTextField: NSTextField {
+        override func resetCursorRects() {
+            addCursorRect(bounds, cursor: .arrow)
+        }
     }
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
@@ -75,5 +85,33 @@ struct SearchField: NSViewRepresentable {
                 return false
             }
         }
+    }
+}
+
+/// Field editor for the switcher's search field that never asserts the I-beam.
+///
+/// Why: while the switcher is open the search field is focused, so this editor
+/// is the window's first responder — and AppKit routes *every* `mouseMoved` to
+/// the first responder, where NSTextView re-sets the I-beam synchronously. The
+/// suppressed WKWebView underneath asserts *arrow* asynchronously (its cursor
+/// IPC arrives at variable latency), so the two alternate: I-beam, arrow,
+/// I-beam… — the flicker. No z-ordered claim can fix that race; the only
+/// stable equilibrium is every claimant agreeing on arrow. This editor is the
+/// last dissenter, so all three cursor paths are pinned to arrow / no-op:
+/// per-move re-assert (`mouseMoved`), tracking-area updates (`cursorUpdate`),
+/// and entry-based cursor rects (`resetCursorRects`).
+/// Typing, caret placement, and drag-selection are unaffected — those ride
+/// `keyDown` / `mouseDown` / `mouseDragged`, which all call through to super.
+final class ArrowCursorFieldEditor: NSTextView {
+    override func mouseMoved(with _: NSEvent) {
+        // Deliberately empty: super re-asserts the I-beam on every move.
+    }
+
+    override func cursorUpdate(with _: NSEvent) {
+        NSCursor.arrow.set()
+    }
+
+    override func resetCursorRects() {
+        addCursorRect(visibleRect, cursor: .arrow)
     }
 }
