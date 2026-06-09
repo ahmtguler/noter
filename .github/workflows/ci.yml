@@ -18,10 +18,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # swiftlint / swiftformat / xcbeautify ship preinstalled on the image;
-      # only xcodegen is missing.
+      # swiftformat ships preinstalled on the macos-26 image; swiftlint was
+      # dropped from it (command not found), and xcbeautify is included for
+      # insurance — brew no-ops in seconds when a formula is already there.
       - name: Install tools
-        run: brew install xcodegen
+        run: brew install swiftlint xcbeautify xcodegen
 
       - name: Cache DerivedData
         uses: actions/cache@v4
