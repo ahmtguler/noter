@@ -72,6 +72,12 @@ struct SwitcherOverlay: View {
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
         .onChange(of: query) { _, _ in selectedIndex = 0 }
+        // ⇧⌘⌫ deletes the highlighted row. PanelKeyMonitor intercepts the
+        // chord before SearchField sees it, so it arrives as a notification.
+        .onReceive(NotificationCenter.default.publisher(for: .noterDeleteActiveNote)) { _ in
+            guard selectedIndex < matches.count else { return }
+            deleteNote(matches[selectedIndex].note)
+        }
     }
 
     private var matches: [(note: Note, score: Int)] {
