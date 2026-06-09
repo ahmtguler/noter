@@ -56,6 +56,8 @@ The compiled bundle is committed so a fresh `swift build` works without Node. **
 
 The pre-commit lint pass runs `swiftlint --strict --quiet`; warnings fail the commit. Common gotchas this repo's `.swiftlint.yml` enforces: `opening_brace`, `cyclomatic_complexity`, `function_parameter_count <= 5`, `type_body_length`, `force_unwrapping`. SwiftFormat re-orders imports alphabetically, so don't manually order them.
 
+GitHub CI (`.github/workflows/ci.yml`) runs on `macos-26`, whose default Xcode matches local dev. Don't pin an exact `/Applications/Xcode_X.Y.app` path — that's how CI rotted unnoticed (the old macos-14/Xcode 15.4 pin couldn't read xcodegen's project format 77 or run Swift Testing). `swiftlint` is brew-installed in the workflow; the image no longer ships it.
+
 ## Architecture (the big picture)
 
 ### Two halves of the editor
@@ -96,6 +98,9 @@ JS → Swift via `WKScriptMessageHandler`:
 { kind: "textChanged", text }                              // doc edited
 { kind: "selectionChanged", styles: ["bold", "italic", …] }// caret moved / styles shifted
 { kind: "log", level, message }                            // dev console relay
+{ kind: "openURL", url }                                   // link clicked — Swift opens it
+{ kind: "linkInspect", url, from, to, rect }               // hover lingered on a link
+{ kind: "linkCreateRequest", from, to, rect }              // toolbar Link with a selection
 ```
 
 Swift → JS via `evaluateJavaScript`:
@@ -104,6 +109,7 @@ Swift → JS via `evaluateJavaScript`:
 window.bridge.setText(text)
 window.bridge.exec("bold" | "heading" | …, arg?)
 window.bridge.applyConfig(EditorConfig)
+window.bridge.setCursorSuppressed(bool)   // overlay up → editor reports arrow, not I-beam
 ```
 
 `EditorBridge` queues outbound messages until JS reports `ready`, then flushes — so the editor receives the initial text and config in the right order.
