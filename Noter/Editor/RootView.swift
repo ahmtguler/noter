@@ -124,8 +124,14 @@ struct RootView: View {
         // Opening a note from ⌘P (or dismissing either overlay) should hand
         // keyboard focus back to the editor. The overlay's text field held the
         // window's first responder, so the editor needs to reclaim it.
-        .onChange(of: showSwitcher) { _, shown in if !shown { focusEditorAfterOverlay() } }
-        .onChange(of: showCommandPalette) { _, shown in if !shown { focusEditorAfterOverlay() } }
+        .onChange(of: showSwitcher) { _, shown in
+            syncEditorCursorSuppression()
+            if !shown { focusEditorAfterOverlay() }
+        }
+        .onChange(of: showCommandPalette) { _, shown in
+            syncEditorCursorSuppression()
+            if !shown { focusEditorAfterOverlay() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .noterShowSwitcher)) { _ in
             showCommandPalette = false
             showSwitcher = true
@@ -377,6 +383,15 @@ struct RootView: View {
         guard !showSwitcher, !showCommandPalette else { return }
         let commands = commandsHolder.commands
         DispatchQueue.main.async { commands?.focus() }
+    }
+
+    /// Tell the editor to drop its I-beam cursor whenever a floating overlay
+    /// covers it, and restore it once both are dismissed. Without this the
+    /// WKWebView keeps asserting CodeMirror's text cursor under the pointer and
+    /// it flickers against the overlay's arrow. Idempotent, so it's safe to
+    /// call from both overlays' onChange even as they hand off to each other.
+    private func syncEditorCursorSuppression() {
+        commandsHolder.commands?.setCursorSuppressed(showSwitcher || showCommandPalette)
     }
 
     /// ⇧⌘⌫ on the open note: move it to Recently Deleted, then fall back to the

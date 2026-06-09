@@ -107,15 +107,9 @@ struct CommandPaletteOverlay: View {
                 .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
-        // Defer arrow cursor set to the next run loop tick so it runs after
-        // WebKit's synchronous I-beam set in the same mouseMoved dispatch.
-        // Events still pass through to SwiftUI's hover system, so row /
-        // icon hover effects keep firing normally.
-        .onContinuousHover { phase in
-            if case .active = phase {
-                DispatchQueue.main.async { NSCursor.arrow.set() }
-            }
-        }
+        // Arrow cursor is owned by ArrowCursorArea (per-event cursorUpdate,
+        // wins by z-order) plus RootView suppressing the editor's own I-beam
+        // while an overlay is up. No run-loop-deferred NSCursor.set race here.
     }
 
     private var contentHeight: CGFloat {

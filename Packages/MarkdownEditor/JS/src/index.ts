@@ -38,6 +38,7 @@ interface BridgeAPI {
     setText: (text: string) => void;
     exec: (command: string, arg: string | null) => void;
     applyConfig: (config: EditorConfig) => void;
+    setCursorSuppressed: (suppressed: boolean) => void;
 }
 
 export interface EditorConfig {
@@ -154,6 +155,13 @@ function bootstrap() {
                 ],
             });
             view.contentDOM.spellcheck = config.spellCheck;
+        },
+        setCursorSuppressed(suppressed: boolean) {
+            // Toggle a class the CSS turns into `cursor: default !important`
+            // on the whole document. Deliberately does NOT call view.focus()
+            // (unlike exec) — an overlay's search field owns first responder
+            // while this is on, and stealing it would break typing there.
+            document.documentElement.classList.toggle("noter-cursor-suppressed", suppressed);
         },
     };
 

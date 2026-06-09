@@ -17,6 +17,15 @@ final class PanelController: NSObject {
     /// across modal-window close transitions) don't dismiss the panel.
     private var suppressHideUntil: Date?
     private let suppressHideWindow: TimeInterval = 0.6
+    /// Shared field editor for the switcher's search field. `isFieldEditor`
+    /// is load-bearing: without it, Return/Tab/first-responder semantics of a
+    /// field editor don't apply and NSTextField editing breaks subtly.
+    private lazy var searchFieldEditor: ArrowCursorFieldEditor = {
+        let editor = ArrowCursorFieldEditor()
+        editor.isFieldEditor = true
+        return editor
+    }()
+
     var onWillShow: (() -> Void)?
 
     init(
@@ -134,6 +143,15 @@ final class PanelController: NSObject {
 }
 
 extension PanelController: NSWindowDelegate {
+    /// The switcher's search field gets a field editor that never asserts the
+    /// I-beam (see `ArrowCursorFieldEditor` for the why). Every other text
+    /// client in this window — there are none today — keeps the default
+    /// editor by returning nil.
+    func windowWillReturnFieldEditor(_: NSWindow, to client: Any?) -> Any? {
+        guard client is SearchField.SwitcherSearchTextField else { return nil }
+        return searchFieldEditor
+    }
+
     func windowDidMove(_: Notification) {
         persistFrame()
     }

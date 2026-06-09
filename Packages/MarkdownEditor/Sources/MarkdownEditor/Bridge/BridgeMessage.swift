@@ -85,6 +85,10 @@ enum OutboundMessage {
     case setText(String)
     case applyConfig(EditorConfiguration)
     case execute(command: BridgeCommand, arg: String?)
+    /// Force the web content's CSS cursor to the default arrow (or restore it).
+    /// Used when an app overlay covers the editor so the WKWebView stops
+    /// asserting its I-beam and fighting the overlay's cursor.
+    case setCursorSuppressed(Bool)
 
     func javascript() -> String {
         switch self {
@@ -97,6 +101,8 @@ enum OutboundMessage {
         case let .execute(command, arg):
             let argLiteral = arg.map { jsString($0) } ?? "null"
             return "window.bridge.exec(\(jsString(command.rawValue)), \(argLiteral))"
+        case let .setCursorSuppressed(suppressed):
+            return "window.bridge.setCursorSuppressed(\(suppressed))"
         }
     }
 
