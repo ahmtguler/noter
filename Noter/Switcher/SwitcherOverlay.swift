@@ -72,6 +72,16 @@ struct SwitcherOverlay: View {
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
         .onChange(of: query) { _, _ in selectedIndex = 0 }
+        // Every mouseMoved that lands on the panel: schedule arrow set on
+        // the NEXT run-loop tick. WebKit's WKContentView sets its I-beam
+        // synchronously inside the same mouseMoved dispatch — by deferring
+        // ours with `async`, we land *after* WebKit and the arrow wins.
+        // Events still pass through, so row .onHover keeps working.
+        .onContinuousHover { phase in
+            if case .active = phase {
+                DispatchQueue.main.async { NSCursor.arrow.set() }
+            }
+        }
         // ⇧⌘⌫ deletes the highlighted row. PanelKeyMonitor intercepts the
         // chord before SearchField sees it, so it arrives as a notification.
         .onReceive(NotificationCenter.default.publisher(for: .noterDeleteActiveNote)) { _ in
@@ -161,6 +171,8 @@ struct SwitcherRow: View {
     let onPin: () -> Void
     let onDelete: () -> Void
 
+    @State private var isHovering = false
+
     var body: some View {
         HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 4) {
@@ -189,7 +201,7 @@ struct SwitcherRow: View {
                         .font(.caption)
                 }
             }
-            Spacer()
+            Spacer(minLength: 0)
             RowIconButton(
                 systemName: isPinned ? "pin.fill" : "pin",
                 tooltip: isPinned ? "Unpin" : "Pin",
@@ -205,20 +217,33 @@ struct SwitcherRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentColor.opacity(0.22) : Color.clear)
+                .fill(rowBackground)
         )
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
+        // contentShape AFTER the outer padding so the whole row rect
+        // (including the spacer between the title and the icons) is
+        // hit-testable for the wrapping Button. Without this, the Spacer
+        // region wasn't registering clicks.
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+    }
+
+    private var rowBackground: Color {
+        if isSelected { return Color.accentColor.opacity(0.22) }
+        if isHovering { return Color.primary.opacity(0.08) }
+        return .clear
     }
 }
 
 /// Hover-aware icon button with a tooltip. Wrapped in a SwiftUI Button so
-/// the click is consumed and doesn't bubble up to the row's outer
-/// `.onTapGesture` — without this the row's commit-selection handler ran
-/// in the same tick, closing the switcher before the user could see the
-/// pin/delete take effect.
+/// the click is consumed and doesn't bubble up to the row's button —
+/// without this the row's commit-selection handler ran in the same tick,
+/// closing the switcher before the user could see the pin/delete take
+/// effect.
 private struct RowIconButton: View {
     let systemName: String
     let tooltip: String
@@ -230,12 +255,17 @@ private struct RowIconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(tint.map { AnyShapeStyle($0) }
                     ?? AnyShapeStyle(HierarchicalShapeStyle.secondary))
-                .frame(width: 24, height: 24)
-                .background(isHovering ? Color.primary.opacity(0.08) : .clear)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .frame(width: 26, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        // Stronger fill than the row's hover tint so the
+                        // icon's hit-target is distinguishable when the row
+                        // itself is also highlighted underneath.
+                        .fill(isHovering ? Color.primary.opacity(0.18) : .clear)
+                )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

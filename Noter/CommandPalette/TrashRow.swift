@@ -9,6 +9,8 @@ struct TrashRow: View {
     let onRestore: () -> Void
     let onPurge: () -> Void
 
+    @State private var isHovering = false
+
     var body: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 2) {
@@ -20,7 +22,7 @@ struct TrashRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            Spacer()
+            Spacer(minLength: 0)
             TrashIconButton(
                 systemName: "arrow.uturn.backward",
                 tooltip: "Restore",
@@ -36,12 +38,21 @@ struct TrashRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentColor.opacity(0.22) : Color.clear)
+                .fill(rowBackground)
         )
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+    }
+
+    private var rowBackground: Color {
+        if isSelected { return Color.accentColor.opacity(0.22) }
+        if isHovering { return Color.primary.opacity(0.08) }
+        return .clear
     }
 }
 
@@ -56,11 +67,13 @@ private struct TrashIconButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(tint)
-                .frame(width: 24, height: 24)
-                .background(isHovering ? Color.primary.opacity(0.08) : .clear)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+                .frame(width: 26, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(isHovering ? Color.primary.opacity(0.18) : .clear)
+                )
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
