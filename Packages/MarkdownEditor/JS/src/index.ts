@@ -128,8 +128,14 @@ function bootstrap() {
             lastEmittedText = text;
             view.dispatch({
                 changes: { from: 0, to: view.state.doc.length, insert: text },
-                selection: clampSelection(view, text),
+                // Drop the caret at the end of the freshly loaded note so the
+                // user can start typing (or arrow up to navigate) right away;
+                // for an empty note this is the start.
+                selection: { anchor: text.length },
             });
+            // Loading a note means we just entered the note view — focus the
+            // editor so keystrokes land without a click first.
+            view.focus();
         },
         exec(command: string, arg: string | null) {
             if (!view) return;
@@ -152,11 +158,6 @@ function bootstrap() {
     };
 
     postToSwift({ kind: "ready" });
-}
-
-function clampSelection(currentView: EditorView, newText: string) {
-    const previous = currentView.state.selection.main.head;
-    return { anchor: Math.min(previous, newText.length) };
 }
 
 function systemAppearance(): EditorAppearance {
