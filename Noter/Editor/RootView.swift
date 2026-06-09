@@ -140,6 +140,13 @@ struct RootView: View {
             showCommandPalette = false
             showSwitcher = false
         }
+        .onReceive(NotificationCenter.default.publisher(for: .noterDeleteActiveNote)) { _ in
+            // ⇧⌘⌫ targets the switcher's highlighted row (handled in the
+            // overlay) or the open note when no overlay is up. The ⌘K palette
+            // has its own Delete row, so the chord is inert while it's shown.
+            guard !showSwitcher, !showCommandPalette else { return }
+            deleteCurrentNote()
+        }
         // .noterShowPreferences is handled by AppDelegate via its
         // PreferencesWindowController — no observer needed here.
     }
@@ -350,6 +357,24 @@ struct RootView: View {
 
     private func createAndOpenNewNote() {
         editor.startBlankDraft()
+    }
+
+    /// ⇧⌘⌫ on the open note: move it to Recently Deleted, then fall back to the
+    /// next note (or a fresh draft). No-op on an unsaved blank draft — there's
+    /// nothing on disk to remove, so `currentNote` is nil.
+    private func deleteCurrentNote() {
+        guard let url = editor.currentNote?.url else { return }
+        do {
+            try app.store.delete(url)
+        } catch {
+            NSLog("[Noter] delete failed: \(error)")
+            return
+        }
+        if let next = app.store.notes.first {
+            editor.open(next)
+        } else {
+            editor.startBlankDraft()
+        }
     }
 }
 

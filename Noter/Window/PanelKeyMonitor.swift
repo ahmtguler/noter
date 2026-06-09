@@ -1,9 +1,9 @@
 import AppKit
 import Foundation
 
-/// Local key event monitor that intercepts `⌘N` / `⌘P` / `⌘,` before the
-/// hosted WKWebView consumes them. Posts notifications that the SwiftUI
-/// `RootView` listens for. Active only while the popup window is key.
+/// Local key event monitor that intercepts `⌘N` / `⌘P` / `⌘K` / `⌘,` and
+/// `⇧⌘⌫` before the hosted WKWebView consumes them. Posts notifications that
+/// the SwiftUI `RootView` listens for. Active only while the popup window is key.
 @MainActor
 final class PanelKeyMonitor {
     private weak var panel: NSWindow?
@@ -36,6 +36,13 @@ final class PanelKeyMonitor {
     private func handle(_ event: NSEvent) -> NSEvent? {
         guard let panel, panel.isKeyWindow else { return event }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        // ⇧⌘⌫ — delete the active note (the open note, or the switcher's
+        // highlighted row). keyCode 51 is delete/backspace; matching the code
+        // avoids the awkward DEL character `charactersIgnoringModifiers` yields.
+        if modifiers == [.command, .shift], event.keyCode == 51 {
+            NotificationCenter.default.post(name: .noterDeleteActiveNote, object: nil)
+            return nil
+        }
         guard modifiers == .command else { return event }
         switch event.charactersIgnoringModifiers?.lowercased() {
         case "n":
@@ -61,4 +68,5 @@ extension Notification.Name {
     static let noterShowSwitcher = Notification.Name("io.gaiaswap.noter.showSwitcher")
     static let noterShowCommandPalette = Notification.Name("io.gaiaswap.noter.showCommandPalette")
     static let noterShowPreferences = Notification.Name("io.gaiaswap.noter.showPreferences")
+    static let noterDeleteActiveNote = Notification.Name("io.gaiaswap.noter.deleteActiveNote")
 }
