@@ -107,6 +107,15 @@ struct CommandPaletteOverlay: View {
                 .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
         )
         .shadow(color: .black.opacity(0.35), radius: 30, y: 12)
+        // Defer arrow cursor set to the next run loop tick so it runs after
+        // WebKit's synchronous I-beam set in the same mouseMoved dispatch.
+        // Events still pass through to SwiftUI's hover system, so row /
+        // icon hover effects keep firing normally.
+        .onContinuousHover { phase in
+            if case .active = phase {
+                DispatchQueue.main.async { NSCursor.arrow.set() }
+            }
+        }
     }
 
     private var contentHeight: CGFloat {
@@ -394,6 +403,8 @@ private struct CommandRow: View {
     let command: PaletteCommand
     let isSelected: Bool
 
+    @State private var isHovering = false
+
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: command.icon)
@@ -410,7 +421,7 @@ private struct CommandRow: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            Spacer()
+            Spacer(minLength: 0)
             if let shortcut = command.shortcut {
                 Text(shortcut)
                     .font(.caption.monospaced())
@@ -422,13 +433,22 @@ private struct CommandRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 8)
-                .fill(isSelected ? Color.accentColor.opacity(0.22) : Color.clear)
+                .fill(rowBackground)
         )
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
+        .contentShape(Rectangle())
+        .onHover { isHovering = command.isEnabled && $0 }
         .opacity(command.isEnabled ? 1.0 : 0.5)
+    }
+
+    private var rowBackground: Color {
+        if isSelected { return Color.accentColor.opacity(0.22) }
+        if isHovering { return Color.primary.opacity(0.08) }
+        return .clear
     }
 
     private var iconStyle: AnyShapeStyle {
