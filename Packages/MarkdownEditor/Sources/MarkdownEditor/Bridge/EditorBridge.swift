@@ -51,6 +51,19 @@ final class EditorBridge: NSObject, WKScriptMessageHandler {
         evaluate(message.javascript(), on: webView)
     }
 
+    /// Make the web view the window's first responder so keystrokes route into
+    /// CodeMirror. Load-bearing when another AppKit view holds first responder
+    /// — an overlay's text field, or the window after the popup re-shows. A
+    /// JS-only `view.focus()` can't reclaim key events in those cases. Skips
+    /// the call when focus already lives inside the web view to avoid flicker.
+    func makeWebViewFirstResponder() {
+        guard let webView, let window = webView.window else { return }
+        if let responder = window.firstResponder as? NSView, responder.isDescendant(of: webView) {
+            return
+        }
+        window.makeFirstResponder(webView)
+    }
+
     // MARK: - WKScriptMessageHandler
 
     nonisolated func userContentController(

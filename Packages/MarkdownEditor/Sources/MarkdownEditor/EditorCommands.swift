@@ -61,6 +61,10 @@ public final class MarkdownCommands: ObservableObject {
     }
 
     public func focus() {
+        // AppKit first: claim window first-responder. The JS exec then sets the
+        // DOM caret/focus inside CodeMirror. Either alone is insufficient when
+        // another view (an overlay field, the re-shown window) held focus.
+        bridge?.makeWebViewFirstResponder()
         exec(.focus)
     }
 

@@ -121,6 +121,11 @@ struct RootView: View {
         .frame(minWidth: 380, minHeight: 360)
         .onAppear { ensureAnOpenNote() }
         .onChange(of: editorFontSizeRaw) { _, _ in resizeWindowIfAtDefault() }
+        // Opening a note from ⌘P (or dismissing either overlay) should hand
+        // keyboard focus back to the editor. The overlay's text field held the
+        // window's first responder, so the editor needs to reclaim it.
+        .onChange(of: showSwitcher) { _, shown in if !shown { focusEditorAfterOverlay() } }
+        .onChange(of: showCommandPalette) { _, shown in if !shown { focusEditorAfterOverlay() } }
         .onReceive(NotificationCenter.default.publisher(for: .noterShowSwitcher)) { _ in
             showCommandPalette = false
             showSwitcher = true
@@ -139,6 +144,11 @@ struct RootView: View {
         .onReceive(NotificationCenter.default.publisher(for: .noterShowPreferences)) { _ in
             showCommandPalette = false
             showSwitcher = false
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .noterFocusEditor)) { _ in
+            // Don't pull focus out of a floating overlay's search/key field.
+            guard !showSwitcher, !showCommandPalette else { return }
+            commandsHolder.commands?.focus()
         }
         .onReceive(NotificationCenter.default.publisher(for: .noterDeleteActiveNote)) { _ in
             // ⇧⌘⌫ targets the switcher's highlighted row (handled in the
@@ -357,6 +367,16 @@ struct RootView: View {
 
     private func createAndOpenNewNote() {
         editor.startBlankDraft()
+    }
+
+    /// Refocus the editor once no overlay is up. Guarded so closing the palette
+    /// to open the switcher (or deleting a note while the switcher stays open)
+    /// doesn't yank focus out from under the still-visible overlay. Deferred a
+    /// tick so the overlay's text field has fully resigned first responder.
+    private func focusEditorAfterOverlay() {
+        guard !showSwitcher, !showCommandPalette else { return }
+        let commands = commandsHolder.commands
+        DispatchQueue.main.async { commands?.focus() }
     }
 
     /// ⇧⌘⌫ on the open note: move it to Recently Deleted, then fall back to the

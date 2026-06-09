@@ -69,4 +69,5 @@ extension Notification.Name {
     static let noterShowCommandPalette = Notification.Name("io.gaiaswap.noter.showCommandPalette")
     static let noterShowPreferences = Notification.Name("io.gaiaswap.noter.showPreferences")
     static let noterDeleteActiveNote = Notification.Name("io.gaiaswap.noter.deleteActiveNote")
+    static let noterFocusEditor = Notification.Name("io.gaiaswap.noter.focusEditor")
 }

@@ -63,6 +63,12 @@ final class PanelController: NSObject {
         panel.orderFrontRegardless()
         panel.makeKey()
         keyMonitor?.install()
+        // Focus the editor so the caret is ready the instant the popup appears
+        // — no click needed. Deferred a tick so it lands after the window has
+        // finished becoming key. RootView ignores this while an overlay is up.
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: .noterFocusEditor, object: nil)
+        }
     }
 
     private func applyAppearance() {
