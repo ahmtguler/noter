@@ -50,6 +50,11 @@ struct SwitcherOverlay: View {
                             .id(item.note.id)
                         }
                     }
+                    // Top/bottom inset so the first/last row's selected or
+                    // hover background doesn't butt against the divider above
+                    // or the container's bottom edge — matches the command
+                    // palette's list inset.
+                    .padding(.vertical, 6)
                 }
                 .onChange(of: selectedIndex) { _, new in
                     if new < matches.count {
