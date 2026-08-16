@@ -1,0 +1,84 @@
+name: Bug report
+description: Something in Noter behaves incorrectly
+title: "fix: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Please fill in enough for the bug to be reproduced from a clean state.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: A clear description of the incorrect behaviour.
+      placeholder: Deleting the open note from the ⌘K palette leaves the file on disk.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps, starting from a freshly launched app.
+      placeholder: |
+        1. Summon the popup with the global hotkey
+        2. Type a character into an existing note
+        3. Within half a second, press ⇧⌘⌫
+        4. Open the vault folder in Finder
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the app does this affect?
+      options:
+        - Editor (CodeMirror / markdown rendering)
+        - Note switcher (⌘P)
+        - Command palette (⌘K)
+        - Window / panel / hotkey
+        - Storage (files, rename, trash, pins)
+        - Preferences / onboarding
+        - Build, CI, or tooling
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "26.2"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Noter version or commit
+      description: Found in Preferences, or the commit SHA you built from.
+      placeholder: 0.1.0 / 8e37b02
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        Noter's own logs are prefixed `[Noter]` / `[MarkdownEditor]`. Collect them with:
+        `/usr/bin/log show --last 5m --predicate 'process == "Noter"' --info --debug --style compact`
+      render: shell
+    validations:
+      required: false
