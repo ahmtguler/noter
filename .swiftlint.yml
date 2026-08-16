@@ -1,6 +1,8 @@
 excluded:
-  - .build
-  - DerivedData
+  # Globbed: `swift test --package-path Packages/MarkdownEditor` drops a .build
+  # directory of generated sources there, not just at the repo root.
+  - "**/.build"
+  - "**/DerivedData"
   - Noter.xcodeproj
   - node_modules
 

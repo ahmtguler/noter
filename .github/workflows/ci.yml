@@ -6,9 +6,58 @@ on:
   pull_request:
     branches: [main]
 
+# A newer push to the same branch makes older runs pointless. Cancelling them
+# matters here: macOS runners bill at 10x on private repos.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  ci:
+  # Cheap Linux job. Gates the expensive macOS job below so a stale bundle or a
+  # type error fails in ~30s instead of burning macOS minutes.
+  js:
+    name: JS typecheck and bundle
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Packages/MarkdownEditor/JS
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Packages/MarkdownEditor/JS/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # editor.bundle.js is committed so `swift build` works without Node. That
+      # trade-off is only safe if something proves the blob still matches its
+      # sources — esbuild is deterministic and npm ci pins the version, so a
+      # rebuild must produce a byte-identical file.
+      - name: Rebuild bundle and check for drift
+        run: |
+          npm run build
+          cd "$GITHUB_WORKSPACE"
+          BUNDLE=Packages/MarkdownEditor/Sources/MarkdownEditor/Resources/editor.bundle.js
+          if ! git diff --quiet -- "$BUNDLE"; then
+            echo "::error file=$BUNDLE::editor.bundle.js is stale. Run 'npm run build' in Packages/MarkdownEditor/JS and commit the result."
+            git diff --stat -- "$BUNDLE"
+            exit 1
+          fi
+          echo "Bundle is in sync with JS/src."
+
+  swift:
     name: Lint, test, build
+    needs: js
     # macos-26's default Xcode (26.4.1) matches local dev. No explicit
     # xcode-select: pinning an exact /Applications path breaks whenever the
     # image rotates versions — that's how the old macos-14 + Xcode 15.4 pin
@@ -41,16 +90,36 @@ jobs:
       - name: SwiftLint
         run: swiftlint --strict --reporter github-actions-logging
 
-      - name: Test
+      # The package has its own test target that the Noter scheme does not
+      # include, so it only runs via swift test.
+      - name: Test MarkdownEditor package
+        run: swift test --package-path Packages/MarkdownEditor
+
+      - name: Test app
         run: |
           set -o pipefail
           xcodebuild test \
             -project Noter.xcodeproj \
             -scheme Noter \
             -destination 'platform=macOS' \
+            -enableCodeCoverage YES \
+            -resultBundlePath TestResults.xcresult \
             | xcbeautify
 
-      - name: Build
+      - name: Coverage summary
+        if: always()
+        run: |
+          if [ -d TestResults.xcresult ]; then
+            {
+              echo "### Code coverage"
+              echo '```'
+              xcrun xccov view --report --only-targets TestResults.xcresult 2>/dev/null \
+                || echo "(no coverage data produced)"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Build (Release)
         run: |
           set -o pipefail
           xcodebuild build \
