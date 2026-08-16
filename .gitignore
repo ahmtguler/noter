@@ -37,6 +37,9 @@ Icon?
 # Node (for commitlint)
 node_modules/
 
+# Test results (produced by `make coverage`)
+*.xcresult
+
 # Misc
 *.log
 *.tmp
