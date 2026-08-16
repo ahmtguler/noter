@@ -64,10 +64,10 @@ final class PanelKeyMonitor {
 }
 
 extension Notification.Name {
-    static let noterNewNote = Notification.Name("io.gaiaswap.noter.newNote")
-    static let noterShowSwitcher = Notification.Name("io.gaiaswap.noter.showSwitcher")
-    static let noterShowCommandPalette = Notification.Name("io.gaiaswap.noter.showCommandPalette")
-    static let noterShowPreferences = Notification.Name("io.gaiaswap.noter.showPreferences")
-    static let noterDeleteActiveNote = Notification.Name("io.gaiaswap.noter.deleteActiveNote")
-    static let noterFocusEditor = Notification.Name("io.gaiaswap.noter.focusEditor")
+    static let noterNewNote = Notification.Name("codes.ahmet.noter.newNote")
+    static let noterShowSwitcher = Notification.Name("codes.ahmet.noter.showSwitcher")
+    static let noterShowCommandPalette = Notification.Name("codes.ahmet.noter.showCommandPalette")
+    static let noterShowPreferences = Notification.Name("codes.ahmet.noter.showPreferences")
+    static let noterDeleteActiveNote = Notification.Name("codes.ahmet.noter.deleteActiveNote")
+    static let noterFocusEditor = Notification.Name("codes.ahmet.noter.focusEditor")
 }

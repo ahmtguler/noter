@@ -1,6 +1,6 @@
 name: Noter
 options:
-  bundleIdPrefix: io.gaiaswap
+  bundleIdPrefix: codes.ahmet
   deploymentTarget:
     macOS: "14.0"
   createIntermediateGroups: true
@@ -52,7 +52,7 @@ targets:
         com.apple.security.network.client: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: io.gaiaswap.noter
+        PRODUCT_BUNDLE_IDENTIFIER: codes.ahmet.noter
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         COMBINE_HIDPI_IMAGES: YES
         ENABLE_PREVIEWS: YES
@@ -67,7 +67,7 @@ targets:
       - path: NoterTests
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: io.gaiaswap.noter.tests
+        PRODUCT_BUNDLE_IDENTIFIER: codes.ahmet.noter.tests
         GENERATE_INFOPLIST_FILE: YES
         BUNDLE_LOADER: $(TEST_HOST)
         TEST_HOST: $(BUILT_PRODUCTS_DIR)/Noter.app/Contents/MacOS/Noter
