@@ -14,6 +14,21 @@ pre-commit:
           exit 0
         fi
         swiftlint lint --strict --quiet {staged_files}
+    # Swift only ships editor.bundle.js, never the TypeScript sources, so a .ts
+    # edit that isn't re-bundled ships nothing. Rebuild and re-stage the blob so
+    # the two can't drift apart in a commit.
+    js-bundle:
+      glob: "Packages/MarkdownEditor/JS/src/*.ts"
+      root: "Packages/MarkdownEditor/JS/"
+      run: |
+        if [ ! -d node_modules ]; then
+          echo "⚠️  node_modules missing in Packages/MarkdownEditor/JS."
+          echo "    Run 'npm install' there — CI will enforce the bundle is current."
+          exit 0
+        fi
+        npm run typecheck
+        npm run build
+      stage_fixed: true
 
 commit-msg:
   commands:
@@ -21,11 +36,41 @@ commit-msg:
       run: npx --yes --package=@commitlint/cli --package=@commitlint/config-conventional -- commitlint --edit {1}
 
 pre-push:
+  parallel: false
   commands:
+    # Trunk-based development: main only moves through reviewed PRs.
+    no-direct-push-to-main:
+      priority: 1
+      run: |
+        branch="$(git rev-parse --abbrev-ref HEAD)"
+        if [ "$branch" = "main" ]; then
+          echo "❌ Direct pushes to main are not allowed."
+          echo ""
+          echo "   Branch off and open a PR instead:"
+          echo "     git checkout -b feat/my-change"
+          echo "     git push -u origin feat/my-change"
+          echo "     gh pr create"
+          exit 1
+        fi
+    branch-name:
+      priority: 2
+      run: |
+        branch="$(git rev-parse --abbrev-ref HEAD)"
+        pattern='^(feat|fix|chore|docs|refactor|test|style|perf|ci|build|revert)/[a-z0-9][a-z0-9._-]*$'
+        if ! echo "$branch" | grep -qE "$pattern"; then
+          echo "❌ Branch name '$branch' does not match <type>/<kebab-case-description>."
+          echo ""
+          echo "   Allowed types: feat fix chore docs refactor test style perf ci build revert"
+          echo "   Example:       feat/link-popover-keyboard-nav"
+          echo ""
+          echo "   Rename with:   git branch -m <new-name>"
+          exit 1
+        fi
     build:
+      priority: 3
       run: |
         if [ ! -d Noter.xcodeproj ]; then
-          echo "ℹ️  Noter.xcodeproj not generated yet (run 'xcodegen generate'). Skipping build."
+          echo "ℹ️  Noter.xcodeproj not generated yet (run 'make generate'). Skipping build."
           exit 0
         fi
         if [ "$(xcode-select -p)" = "/Library/Developer/CommandLineTools" ]; then
@@ -35,6 +80,7 @@ pre-push:
         set -o pipefail
         xcodebuild -project Noter.xcodeproj -scheme Noter -configuration Debug -destination 'platform=macOS' build | xcbeautify
     test:
+      priority: 4
       run: |
         if [ ! -d Noter.xcodeproj ]; then
           echo "ℹ️  Noter.xcodeproj not generated yet. Skipping tests."
@@ -45,4 +91,5 @@ pre-push:
           exit 0
         fi
         set -o pipefail
+        swift test --package-path Packages/MarkdownEditor
         xcodebuild test -project Noter.xcodeproj -scheme Noter -destination 'platform=macOS' | xcbeautify
