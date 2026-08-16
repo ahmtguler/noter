@@ -1,0 +1,54 @@
+name: Feature request
+description: Suggest a capability or an improvement
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that Noter makes hard or impossible today?
+      placeholder: I keep notes per project and there's no way to filter the switcher to one folder.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should happen instead. Include the interaction if it involves UI.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about, and why this one is better.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Editor (CodeMirror / markdown rendering)
+        - Note switcher (⌘P)
+        - Command palette (⌘K)
+        - Window / panel / hotkey
+        - Storage (files, rename, trash, pins)
+        - Preferences / onboarding
+        - Build, CI, or tooling
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      description: Noter is deliberately a small, fast popup notes app that stores plain markdown.
+      options:
+        - label: This fits an app whose notes stay plain `.md` files in an Obsidian vault
+          required: false
