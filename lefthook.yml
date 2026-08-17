@@ -36,7 +36,9 @@ commit-msg:
       run: npx --yes --package=@commitlint/cli --package=@commitlint/config-conventional -- commitlint --edit {1}
 
 pre-push:
-  parallel: false
+  # piped: stop at the first failing job. Without it a rejected branch name
+  # still pays for a full build and test run before reporting the failure.
+  piped: true
   # v2 `jobs` (an ordered list), not `commands`. The guards below must run on
   # every push, including one that changes no files — lefthook filters
   # `commands` against {push_files} and silently skips them when that set is
