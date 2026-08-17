@@ -78,6 +78,11 @@ The pre-commit lint pass runs `swiftlint --strict --quiet`; warnings fail the co
 
 Hooks degrade gracefully — missing `node_modules`, an ungenerated `Noter.xcodeproj`, or a Command-Line-Tools-only `xcode-select` each skip with a message rather than blocking, on the assumption CI enforces.
 
+**lefthook 2.x gotchas** (each cost a debugging round):
+- `pre-push` uses **`jobs:`** (an ordered list), not `commands:`. Unknown keys inside `commands:` are **silently dropped** — `priority` and `skip_empty` parsed away to nothing and the guards looked configured while doing nothing. Verify any config change with `lefthook dump`, which prints what lefthook actually parsed.
+- `piped: true` on `pre-push` is deliberate: without it a rejected branch name still pays for a full Debug build and both test suites before reporting.
+- lefthook skips the **entire** `pre-push` hook when the push carries no file changes, so a metadata-only amend-and-force-push to `main` slips past the guard. Real pushes always carry files and are guarded. Don't treat the guard as airtight — it's a speed bump, not branch protection.
+
 ## CI (`.github/workflows/ci.yml`)
 
 Two jobs. `js` on `ubuntu-latest` typechecks and rebuilds the bundle; `swift` on `macos-26` does everything else and `needs: js`, so a stale bundle or type error fails in seconds instead of spending macOS runner minutes (billed at **10x** on private repos). `concurrency: cancel-in-progress` kills superseded runs.
