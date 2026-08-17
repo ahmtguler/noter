@@ -25,7 +25,7 @@ jobs:
       run:
         working-directory: Packages/MarkdownEditor/JS
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v4
         with:
@@ -65,7 +65,7 @@ jobs:
     # the Swift Testing suites need Xcode 16+ anyway).
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # swiftlint was dropped from the macos-26 image (command not found), and
       # xcbeautify is included for insurance — brew no-ops in seconds when a
