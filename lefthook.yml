@@ -37,10 +37,15 @@ commit-msg:
 
 pre-push:
   parallel: false
-  commands:
+  # v2 `jobs` (an ordered list), not `commands`. The guards below must run on
+  # every push, including one that changes no files — lefthook filters
+  # `commands` against {push_files} and silently skips them when that set is
+  # empty, which let an amend-and-force-push to main slip straight past the
+  # guard. `commands` also silently drops unknown keys, so `priority` and
+  # `skip_empty` looked applied while doing nothing; jobs run in list order.
+  jobs:
     # Trunk-based development: main only moves through reviewed PRs.
-    no-direct-push-to-main:
-      priority: 1
+    - name: no-direct-push-to-main
       run: |
         branch="$(git rev-parse --abbrev-ref HEAD)"
         if [ "$branch" = "main" ]; then
@@ -52,8 +57,8 @@ pre-push:
           echo "     gh pr create"
           exit 1
         fi
-    branch-name:
-      priority: 2
+
+    - name: branch-name
       run: |
         branch="$(git rev-parse --abbrev-ref HEAD)"
         pattern='^(feat|fix|chore|docs|refactor|test|style|perf|ci|build|revert)/[a-z0-9][a-z0-9._-]*$'
@@ -66,8 +71,8 @@ pre-push:
           echo "   Rename with:   git branch -m <new-name>"
           exit 1
         fi
-    build:
-      priority: 3
+
+    - name: build
       run: |
         if [ ! -d Noter.xcodeproj ]; then
           echo "ℹ️  Noter.xcodeproj not generated yet (run 'make generate'). Skipping build."
@@ -79,8 +84,8 @@ pre-push:
         fi
         set -o pipefail
         xcodebuild -project Noter.xcodeproj -scheme Noter -configuration Debug -destination 'platform=macOS' build | xcbeautify
-    test:
-      priority: 4
+
+    - name: test
       run: |
         if [ ! -d Noter.xcodeproj ]; then
           echo "ℹ️  Noter.xcodeproj not generated yet. Skipping tests."
