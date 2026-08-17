@@ -67,11 +67,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # swiftformat ships preinstalled on the macos-26 image; swiftlint was
-      # dropped from it (command not found), and xcbeautify is included for
-      # insurance — brew no-ops in seconds when a formula is already there.
+      # swiftlint was dropped from the macos-26 image (command not found), and
+      # xcbeautify is included for insurance — brew no-ops in seconds when a
+      # formula is already there.
       - name: Install tools
         run: brew install swiftlint xcbeautify xcodegen
+
+      # SwiftFormat's default ruleset changes between releases — 0.62 added
+      # wrapIfStatementBodies — so the image's preinstalled build silently
+      # disagreed with local dev and failed CI on code that formatted clean.
+      # Pin it to .swiftformat-version instead of trusting whatever the image
+      # ships. Installed ahead of $PATH because the image's copy lives in the
+      # Homebrew prefix, which would otherwise win.
+      - name: Install SwiftFormat (pinned)
+        run: |
+          VERSION="$(tr -d '[:space:]' < .swiftformat-version)"
+          curl -fsSL -o /tmp/swiftformat.zip \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/${VERSION}/swiftformat.zip"
+          unzip -q -o /tmp/swiftformat.zip -d /tmp/swiftformat
+          mkdir -p "$HOME/.local/bin"
+          mv /tmp/swiftformat/swiftformat "$HOME/.local/bin/swiftformat"
+          chmod +x "$HOME/.local/bin/swiftformat"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          INSTALLED="$("$HOME/.local/bin/swiftformat" --version)"
+          if [ "$INSTALLED" != "$VERSION" ]; then
+            echo "::error::expected SwiftFormat $VERSION, got $INSTALLED"
+            exit 1
+          fi
+          echo "SwiftFormat $INSTALLED pinned."
 
       - name: Cache DerivedData
         uses: actions/cache@v4
