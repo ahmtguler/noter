@@ -1,10 +1,11 @@
-.PHONY: help fmt fmt-check lint test test-app test-package build run clean ci generate hooks js js-install js-typecheck coverage
+.PHONY: help fmt fmt-check fmt-version lint test test-app test-package build run clean ci generate hooks js js-install js-typecheck coverage
 
 PROJECT := Noter.xcodeproj
 SCHEME  := Noter
 DEST    := platform=macOS
 JS_DIR  := Packages/MarkdownEditor/JS
 PACKAGE := Packages/MarkdownEditor
+SWIFTFORMAT_VERSION := $(shell tr -d '[:space:]' < .swiftformat-version)
 
 help:
 	@echo "Targets:"
@@ -12,6 +13,7 @@ help:
 	@echo "  make hooks        - Install lefthook git hooks"
 	@echo "  make fmt          - SwiftFormat all sources"
 	@echo "  make fmt-check    - SwiftFormat in lint mode (no writes)"
+	@echo "  make fmt-version  - Warn if local SwiftFormat differs from the pin"
 	@echo "  make lint         - SwiftLint --strict"
 	@echo "  make test         - Run app + package tests"
 	@echo "  make coverage     - Run app tests and print per-target coverage"
@@ -28,10 +30,23 @@ generate:
 hooks:
 	lefthook install
 
-fmt:
+# SwiftFormat changes its default ruleset between releases, so a version that
+# disagrees with CI's pin will either reformat code CI rejects, or pass code CI
+# fails. Warn rather than block: the message is enough to explain a CI failure.
+fmt-version:
+	@installed="$$(swiftformat --version 2>/dev/null)"; \
+	if [ -z "$$installed" ]; then \
+		echo "⚠️  SwiftFormat is not installed. This repo pins $(SWIFTFORMAT_VERSION)."; \
+	elif [ "$$installed" != "$(SWIFTFORMAT_VERSION)" ]; then \
+		echo "⚠️  SwiftFormat $$installed is installed, but this repo pins $(SWIFTFORMAT_VERSION)."; \
+		echo "    CI uses the pinned version, so formatting results may differ."; \
+		echo "    Get it: https://github.com/nicklockwood/SwiftFormat/releases/tag/$(SWIFTFORMAT_VERSION)"; \
+	fi
+
+fmt: fmt-version
 	swiftformat .
 
-fmt-check:
+fmt-check: fmt-version
 	swiftformat --lint .
 
 lint:
