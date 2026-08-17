@@ -14,10 +14,14 @@ Noter is a native macOS popup notes app (Raycast Notes / Obsidian Quick Note sty
 |---|---|
 | `make run` | Release build + launch the `.app` |
 | `make build` | Release build only |
-| `make test` | `xcodebuild test` (Swift Testing + XCTest) |
-| `make fmt` | SwiftFormat the whole tree |
+| `make test` | Package tests (`swift test`) + app tests (`xcodebuild test`) |
+| `make coverage` | App tests with coverage, then a per-target report |
+| `make fmt` | SwiftFormat the whole tree (warns on version drift from the pin) |
+| `make fmt-check` | SwiftFormat in `--lint` mode, no writes |
 | `make lint` | `swiftlint --strict` |
-| `make ci` | What CI runs: lint + test + build |
+| `make js` | Rebuild `editor.bundle.js` from `JS/src` |
+| `make js-typecheck` | `tsc --noEmit` over the TypeScript sources |
+| `make ci` | Everything CI runs, in CI's order |
 | `make generate` | Regenerate `Noter.xcodeproj` from `project.yml` (xcodegen) |
 | `make hooks` | `lefthook install` |
 
@@ -47,16 +51,45 @@ npm run watch            # rebuild on every save while iterating
 
 The compiled bundle is committed so a fresh `swift build` works without Node. **Always rebuild the bundle** after editing any `.ts` file in `JS/src/` — Swift only ships the bundle, not the TypeScript sources.
 
+## Development workflow (trunk-based)
+
+`main` is always releasable. **Never commit or push directly to it** — the pre-push hook rejects that. Every change goes through a branch and a PR:
+
+```bash
+git checkout -b fix/link-paren-escaping   # <type>/<kebab-case>, enforced on push
+# work, commit in Conventional Commits format
+git push -u origin fix/link-paren-escaping
+gh pr create                               # CI must be green before merge
+gh pr merge --rebase --delete-branch       # rebase, so history stays linear and granular
+```
+
+Branch prefixes are the commit types: `feat` `fix` `chore` `docs` `refactor` `test` `style` `perf` `ci` `build` `revert`.
+
+The repo is **private on the free plan**, so GitHub branch protection is unavailable (the API 403s). Enforcement is therefore client-side only — `--no-verify` bypasses it. If it ever goes public, turn on branch protection with both CI job names as required checks and this becomes real.
+
 ## Hooks (lefthook)
 
-`lefthook install` wires:
-- **pre-commit**: SwiftFormat (auto-fixes & re-stages) + SwiftLint `--strict` on staged Swift files.
+`make hooks` wires:
+- **pre-commit**: SwiftFormat (auto-fixes & re-stages) + SwiftLint `--strict` on staged Swift files. When `JS/src/*.ts` is staged it also runs `npm run typecheck` and rebuilds `editor.bundle.js`, re-staging the blob so source and bundle can't drift apart inside one commit.
 - **commit-msg**: commitlint with [Conventional Commits](https://www.conventionalcommits.org/). **Header is hard-capped at 100 characters**; the rest of the body is free.
-- **pre-push**: `xcodebuild build` (Debug) + `xcodebuild test`.
+- **pre-push**: rejects pushes to `main`, validates the branch name, then `xcodebuild build` (Debug) + `swift test` (package) + `xcodebuild test` (app).
 
 The pre-commit lint pass runs `swiftlint --strict --quiet`; warnings fail the commit. Common gotchas this repo's `.swiftlint.yml` enforces: `opening_brace`, `cyclomatic_complexity`, `function_parameter_count <= 5`, `type_body_length`, `force_unwrapping`. SwiftFormat re-orders imports alphabetically, so don't manually order them.
 
-GitHub CI (`.github/workflows/ci.yml`) runs on `macos-26`, whose default Xcode matches local dev. Don't pin an exact `/Applications/Xcode_X.Y.app` path — that's how CI rotted unnoticed (the old macos-14/Xcode 15.4 pin couldn't read xcodegen's project format 77 or run Swift Testing). `swiftlint` is brew-installed in the workflow; the image no longer ships it.
+Hooks degrade gracefully — missing `node_modules`, an ungenerated `Noter.xcodeproj`, or a Command-Line-Tools-only `xcode-select` each skip with a message rather than blocking, on the assumption CI enforces.
+
+## CI (`.github/workflows/ci.yml`)
+
+Two jobs. `js` on `ubuntu-latest` typechecks and rebuilds the bundle; `swift` on `macos-26` does everything else and `needs: js`, so a stale bundle or type error fails in seconds instead of spending macOS runner minutes (billed at **10x** on private repos). `concurrency: cancel-in-progress` kills superseded runs.
+
+- **Don't add path filters to either job.** If branch protection is ever enabled, a required check that gets skipped blocks the PR forever.
+- **`editor.bundle.js` drift is a hard failure.** The `js` job rebuilds and diffs against the committed blob. esbuild is deterministic and `npm ci` pins the version, so the rebuild is byte-reproducible — verified identical across macOS arm64 and Linux x64. A Dependabot bump of `esbuild` will therefore fail this check until someone commits a rebuilt bundle; that's intended.
+- **SwiftFormat is pinned** via `.swiftformat-version`, downloaded from GitHub releases and placed ahead of `$PATH`. Its default ruleset changes between releases — 0.62 added `wrapIfStatementBodies`, which failed CI on code that formatted clean under local 0.61.1. Never rely on the runner image's copy. `make fmt` warns when the local install disagrees with the pin; upgrading is a deliberate PR carrying its own reformatting diff.
+- **`swift test --package-path Packages/MarkdownEditor` runs separately.** The `Noter` scheme's testables list only `NoterTests`, so package tests are invisible to `xcodebuild test`. They went un-run so long that the file stopped compiling (a missing `import Foundation`) without anyone noticing.
+- Don't pin an exact `/Applications/Xcode_X.Y.app` path — that's how CI rotted unnoticed (the old macos-14/Xcode 15.4 pin couldn't read xcodegen's project format 77 or run Swift Testing). `swiftlint` is brew-installed; the image no longer ships it.
+- `.swiftlint.yml` excludes `.build` **as a glob** (`**/.build`). `swift test` generates sources under `Packages/MarkdownEditor/.build`, and a bare `.build` entry only matches the repo root, so SwiftLint walked in and reported 50 violations in generated code.
+
+`make ci` mirrors the pipeline step for step — a green `make ci` should mean a green pipeline.
 
 ## Architecture (the big picture)
 
