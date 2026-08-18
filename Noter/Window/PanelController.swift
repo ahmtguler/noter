@@ -48,7 +48,10 @@ final class PanelController: NSObject {
         }
     }
 
-    deinit {
+    /// `isolated` so the deinit runs on the main actor, where the observer
+    /// token lives. A plain deinit is nonisolated and Swift 6 refuses to let it
+    /// touch this class's non-Sendable state at all.
+    isolated deinit {
         if let defaultsObserver {
             NotificationCenter.default.removeObserver(defaultsObserver)
         }

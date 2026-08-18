@@ -85,6 +85,17 @@ Hooks degrade gracefully — missing `node_modules`, an ungenerated `Noter.xcode
 - `piped: true` on `pre-push` is deliberate: without it a rejected branch name still pays for a full Debug build and both test suites before reporting.
 - lefthook skips the **entire** `pre-push` hook when the push carries no file changes, so a metadata-only amend-and-force-push to `main` slips past the guard. Real pushes always carry files and are guarded. Don't treat the guard as airtight — it's a speed bump, not branch protection.
 
+## Swift 6 language mode
+
+The app and the package both build in **Swift 6 language mode** (`SWIFT_VERSION: "6"` in `project.yml`, `swift-tools-version: 6.0` in `Package.swift`), so data-race safety violations are compile errors, not warnings. Combined with `SWIFT_TREAT_WARNINGS_AS_ERRORS: YES`, concurrency mistakes cannot reach `main`.
+
+Two patterns exist because of it, and both are load-bearing:
+
+- **`isolated deinit`** in `PanelController` and `PanelKeyMonitor`. A plain `deinit` is nonisolated even on a `@MainActor` class, so it may not touch the class's own non-`Sendable` state — which is exactly what removing a `NotificationCenter` observer or an `NSEvent` monitor requires. `isolated deinit` (Swift 6.1+) runs it on the main actor instead. Don't "simplify" it back.
+- **`@MainActor enum RelativeTime`.** It caches a `RelativeDateTimeFormatter`, which is a non-thread-safe class held in a `static let`. The isolation is a real fix for shared mutable state, not a compiler workaround; both call sites are SwiftUI bodies already on the main actor.
+
+Note that `SWIFT_VERSION` is the *language mode*, not the compiler — valid values are only `4`, `4.2`, `5`, `6`. It previously read `"5.10"`, which is not a language mode at all; Xcode silently normalized it to `5`.
+
 ## Dependencies (pinned, upgraded on purpose)
 
 **Every dependency is pinned to an exact version, and Dependabot does not open pull requests.** Routine version-bump PRs were pure noise on a solo project, so `.github/dependabot.yml` is deliberately gone. Don't add it back.
