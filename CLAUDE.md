@@ -65,7 +65,17 @@ gh pr merge --rebase --delete-branch       # rebase, so history stays linear and
 
 Branch prefixes are the commit types: `feat` `fix` `chore` `docs` `refactor` `test` `style` `perf` `ci` `build` `revert`.
 
-The repo is **private on the free plan**, so GitHub branch protection is unavailable (the API 403s). Enforcement is therefore client-side only — `--no-verify` bypasses it. If it ever goes public, turn on branch protection with both CI job names as required checks and this becomes real.
+The repo is **public**, and `main` is protected server-side — this is enforced, not advisory:
+
+- Pull requests are required; direct pushes are rejected with `GH006`.
+- Both CI jobs must pass and be up to date: `JS typecheck and bundle`, `Lint, test, build`.
+- **`enforce_admins` is on**, so the repo owner is not exempt either. With it off, protection is decorative on a solo project — which is the whole thing this was meant to stop.
+- Linear history is required, and force pushes and branch deletion are blocked. Only rebase merges are allowed; merge commits and squashing are disabled, and branches auto-delete on merge.
+- Approvals required: **0**. A solo maintainer cannot approve their own PR, so requiring one would deadlock every merge.
+
+The lefthook pre-push guard still exists and still helps — it fails in seconds instead of after a round trip — but it is the convenience layer. Branch protection is the part that actually holds, since `--no-verify` bypasses the hook and nothing bypasses the server.
+
+For a genuine emergency, disable `enforce_admins` in repo settings rather than trying to force-push; force pushes to `main` are blocked outright.
 
 ## Hooks (lefthook)
 
@@ -83,7 +93,7 @@ Hooks degrade gracefully — missing `node_modules`, an ungenerated `Noter.xcode
 **lefthook 2.x gotchas** (each cost a debugging round):
 - `pre-push` uses **`jobs:`** (an ordered list), not `commands:`. Unknown keys inside `commands:` are **silently dropped** — `priority` and `skip_empty` parsed away to nothing and the guards looked configured while doing nothing. Verify any config change with `lefthook dump`, which prints what lefthook actually parsed.
 - `piped: true` on `pre-push` is deliberate: without it a rejected branch name still pays for a full Debug build and both test suites before reporting.
-- lefthook skips the **entire** `pre-push` hook when the push carries no file changes, so a metadata-only amend-and-force-push to `main` slips past the guard. Real pushes always carry files and are guarded. Don't treat the guard as airtight — it's a speed bump, not branch protection.
+- lefthook skips the **entire** `pre-push` hook when the push carries no file changes, so a metadata-only amend-and-force-push slips past the guard. Real pushes always carry files and are guarded. The gap no longer matters for `main` — branch protection rejects those server-side — but don't treat the hook as airtight anywhere else.
 
 ## Swift 6 language mode
 
