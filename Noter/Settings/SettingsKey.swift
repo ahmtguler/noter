@@ -7,7 +7,6 @@ enum SettingsKey {
     static let subfolder = "noter.subfolder"
     static let popupFrame = "noter.popupFrame"
     static let pinned = "noter.pinned"
-    static let currentNoteURL = "noter.currentNoteURL"
     static let didOnboard = "noter.didOnboard"
     static let idleNewNoteMinutes = "noter.idleNewNoteMinutes"
     static let showFormattingToolbar = "noter.showFormattingToolbar"
