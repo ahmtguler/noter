@@ -33,7 +33,7 @@ jobs:
           # actually proves this agrees with local dev: esbuild ships a native
           # binary, so output depends on its version rather than Node's, and a
           # mismatch would surface as drift rather than silently.
-          node-version: 22
+          node-version: 24
           cache: npm
           cache-dependency-path: Packages/MarkdownEditor/JS/package-lock.json
 
@@ -74,34 +74,48 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # swiftlint was dropped from the macos-26 image (command not found), and
-      # xcbeautify is included for insurance — brew no-ops in seconds when a
-      # formula is already there.
+      # xcbeautify and xcodegen are version-tolerant here — they format output
+      # and generate the project, neither of which gates the build on their
+      # exact release. brew no-ops in seconds when a formula is present.
       - name: Install tools
-        run: brew install swiftlint xcbeautify xcodegen
+        run: brew install xcbeautify xcodegen
 
-      # SwiftFormat's default ruleset changes between releases — 0.62 added
-      # wrapIfStatementBodies — so the image's preinstalled build silently
-      # disagreed with local dev and failed CI on code that formatted clean.
-      # Pin it to .swiftformat-version instead of trusting whatever the image
-      # ships. Installed ahead of $PATH because the image's copy lives in the
-      # Homebrew prefix, which would otherwise win.
-      - name: Install SwiftFormat (pinned)
+      # Both linters gate the build, and both change their default rules
+      # between releases — SwiftFormat 0.62 added wrapIfStatementBodies, which
+      # failed CI on code that formatted clean under the 0.61 everyone had
+      # locally. `brew install swiftlint` was the same trap one step removed:
+      # it always fetched the newest release, so CI silently ran a different
+      # linter than local dev. Pin both to the versions recorded in the repo and
+      # install them ahead of $PATH, since the image's copies live in the
+      # Homebrew prefix and would otherwise win.
+      - name: Install pinned linters
         run: |
-          VERSION="$(tr -d '[:space:]' < .swiftformat-version)"
-          curl -fsSL -o /tmp/swiftformat.zip \
-            "https://github.com/nicklockwood/SwiftFormat/releases/download/${VERSION}/swiftformat.zip"
-          unzip -q -o /tmp/swiftformat.zip -d /tmp/swiftformat
           mkdir -p "$HOME/.local/bin"
-          mv /tmp/swiftformat/swiftformat "$HOME/.local/bin/swiftformat"
-          chmod +x "$HOME/.local/bin/swiftformat"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          INSTALLED="$("$HOME/.local/bin/swiftformat" --version)"
-          if [ "$INSTALLED" != "$VERSION" ]; then
-            echo "::error::expected SwiftFormat $VERSION, got $INSTALLED"
+
+          FORMAT_VERSION="$(tr -d '[:space:]' < .swiftformat-version)"
+          curl -fsSL -o /tmp/swiftformat.zip \
+            "https://github.com/nicklockwood/SwiftFormat/releases/download/${FORMAT_VERSION}/swiftformat.zip"
+          unzip -q -o /tmp/swiftformat.zip -d /tmp/swiftformat
+          install -m 0755 /tmp/swiftformat/swiftformat "$HOME/.local/bin/swiftformat"
+
+          LINT_VERSION="$(tr -d '[:space:]' < .swiftlint-version)"
+          curl -fsSL -o /tmp/swiftlint.zip \
+            "https://github.com/realm/SwiftLint/releases/download/${LINT_VERSION}/portable_swiftlint.zip"
+          unzip -q -o /tmp/swiftlint.zip -d /tmp/swiftlint
+          install -m 0755 /tmp/swiftlint/swiftlint "$HOME/.local/bin/swiftlint"
+
+          INSTALLED_FORMAT="$("$HOME/.local/bin/swiftformat" --version)"
+          INSTALLED_LINT="$("$HOME/.local/bin/swiftlint" version)"
+          if [ "$INSTALLED_FORMAT" != "$FORMAT_VERSION" ]; then
+            echo "::error::expected SwiftFormat $FORMAT_VERSION, got $INSTALLED_FORMAT"
             exit 1
           fi
-          echo "SwiftFormat $INSTALLED pinned."
+          if [ "$INSTALLED_LINT" != "$LINT_VERSION" ]; then
+            echo "::error::expected SwiftLint $LINT_VERSION, got $INSTALLED_LINT"
+            exit 1
+          fi
+          echo "SwiftFormat $INSTALLED_FORMAT and SwiftLint $INSTALLED_LINT pinned."
 
       - name: Cache DerivedData
         uses: actions/cache@v6
