@@ -23,8 +23,13 @@ packages:
     # Exact, not `from:`. Package.resolved lives inside the gitignored
     # Noter.xcodeproj, so a range let CI and local dev silently resolve
     # different versions — `from: "2.2.1"` was already floating up to 2.4.0.
-    # Pinning here is the lockfile. 3.0.1 exists; bump deliberately.
-    exactVersion: "2.4.0"
+    # Pinning here is the lockfile; bump deliberately.
+    #
+    # 3.x renamed `defaultShortcut`/`default:` to `initialShortcut`/`initial:`,
+    # neither of which this app used — `Self("toggleNoter")`, `onKeyDown(for:)`
+    # and `Recorder(for:)` are the whole surface. Taken for its Swift 6.3
+    # release-build crash fix.
+    exactVersion: "3.0.1"
   MarkdownEditor:
     path: Packages/MarkdownEditor
 
