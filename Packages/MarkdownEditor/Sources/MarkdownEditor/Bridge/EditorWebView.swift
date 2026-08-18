@@ -33,6 +33,16 @@ struct EditorWebView: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        // SwiftUI builds the coordinator once but re-creates this struct on
+        // every update, so a coordinator holding its original binding and
+        // callbacks would keep writing keystrokes into whichever `Binding` and
+        // closures existed at creation. Harmless while the host keeps handing
+        // over the same ones; silent data loss the moment it doesn't.
+        context.coordinator.rebind(
+            text: $text,
+            onCommandsReady: onCommandsReady,
+            onOpenURL: onOpenURL
+        )
         context.coordinator.update(text: text, configuration: configuration)
     }
 
@@ -53,13 +63,18 @@ struct EditorWebView: NSViewRepresentable {
 
     // MARK: - Loading
 
-    private func loadBundledEditor(into webView: WKWebView) {
+    /// Static so the coordinator can reload after a content-process crash.
+    fileprivate static func loadBundledEditor(into webView: WKWebView) {
         guard let htmlURL = Bundle.module.url(forResource: "editor", withExtension: "html") else {
             NSLog("[MarkdownEditor] editor.html missing from bundle")
             return
         }
         let baseURL = htmlURL.deletingLastPathComponent()
         webView.loadFileURL(htmlURL, allowingReadAccessTo: baseURL)
+    }
+
+    private func loadBundledEditor(into webView: WKWebView) {
+        Self.loadBundledEditor(into: webView)
     }
 
     // MARK: - Coordinator
@@ -104,7 +119,7 @@ struct EditorWebView: NSViewRepresentable {
             bridge.onSelectionChanged = { [weak self] styles in
                 self?.handleSelectionChanged(styles)
             }
-            bridge.onOpenURL = { [weak self] url in self?.onOpenURL?(url) }
+            bridge.onOpenURL = { [weak self] url in self?.handleOpenURL(url) }
             bridge.onLinkInspect = { [weak self] payload in
                 self?.linkState.presentInspect(payload)
             }
@@ -122,11 +137,20 @@ struct EditorWebView: NSViewRepresentable {
         }
 
         func attach(to webView: WKWebView) {
+            webView.navigationDelegate = self
             bridge.attach(to: webView)
         }
 
         func detach() {
             bridge.detach()
+        }
+
+        /// Clears the handshake and the "already sent" bookkeeping so the page
+        /// that comes back after a reload is re-populated from scratch.
+        func prepareForReload() {
+            bridge.prepareForReload()
+            lastSentText = nil
+            lastSentConfig = nil
         }
 
         /// Called from `updateNSView` whenever SwiftUI re-evaluates the view.
@@ -138,8 +162,16 @@ struct EditorWebView: NSViewRepresentable {
             pushTextIfNeeded(text)
         }
 
-        func updateBinding(_ binding: Binding<String>) {
-            textBinding = binding
+        /// Re-points at the current binding and callbacks. Called from
+        /// `updateNSView`; see the note there.
+        func rebind(
+            text: Binding<String>,
+            onCommandsReady: ((MarkdownCommands) -> Void)?,
+            onOpenURL: ((String) -> Void)?
+        ) {
+            textBinding = text
+            self.onCommandsReady = onCommandsReady
+            self.onOpenURL = onOpenURL
         }
 
         // MARK: Inbound
@@ -165,6 +197,30 @@ struct EditorWebView: NSViewRepresentable {
             commands.activeStyles = styles
         }
 
+        /// Schemes the host is allowed to open from a clicked link.
+        ///
+        /// Notes are plain files in a vault that may be synced or shared, so
+        /// their contents are not necessarily authored by the person clicking.
+        /// A `file://` link would open an arbitrary local file with its default
+        /// handler on a single click, with no confirmation. The package decides
+        /// what counts as a link click, so it filters here rather than trusting
+        /// every host to.
+        private static let allowedSchemes: Set<String> = ["http", "https", "mailto"]
+
+        private func handleOpenURL(_ url: String) {
+            let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+            // A missing scheme is fine — hosts commonly prefix https:// for
+            // bare text like "example.com". Only reject schemes we know about
+            // and disallow. Kept on one line: a wrapped multi-clause condition
+            // makes SwiftFormat move the brace down, which SwiftLint rejects.
+            let scheme = URL(string: trimmed)?.scheme?.lowercased()
+            if let scheme, !Self.allowedSchemes.contains(scheme) {
+                NSLog("[MarkdownEditor] blocked link with disallowed scheme: \(scheme)")
+                return
+            }
+            onOpenURL?(trimmed)
+        }
+
         // MARK: Outbound
 
         private func pushConfigIfNeeded(force: Bool = false) {
@@ -178,6 +234,26 @@ struct EditorWebView: NSViewRepresentable {
             lastSentText = text
             bridge.send(.setText(text))
         }
+    }
+}
+
+// MARK: - Content process recovery
+
+extension EditorWebView.Coordinator: WKNavigationDelegate {
+    /// WKWebView runs CodeMirror in a separate content process, and that
+    /// process can be killed — under memory pressure, or by a WebKit crash. The
+    /// page then goes blank and stays blank: nothing reset the bridge's ready
+    /// flag, so every later message queued forever against a page that would
+    /// never report ready again. In a menu-bar app that lives for weeks, the
+    /// user met a dead editor and had to quit and relaunch.
+    ///
+    /// Reload the bundled HTML instead. The fresh page reports `ready`, which
+    /// flushes the queue and re-pushes the current text and config, so the note
+    /// comes back with whatever the binding still holds.
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        NSLog("[MarkdownEditor] web content process terminated — reloading the editor")
+        prepareForReload()
+        EditorWebView.loadBundledEditor(into: webView)
     }
 }
 

@@ -43,6 +43,15 @@ final class EditorBridge: NSObject, WKScriptMessageHandler {
         pendingOutbound.removeAll()
     }
 
+    /// Drops the ready handshake so outbound messages queue again, without
+    /// tearing down the script-message handler the way `detach` does. Used when
+    /// the web content process dies and the page is reloaded: the new page has
+    /// no CodeMirror until it reports `ready`, and anything evaluated before
+    /// then is silently lost.
+    func prepareForReload() {
+        isReady = false
+    }
+
     func send(_ message: OutboundMessage) {
         guard isReady, let webView else {
             pendingOutbound.append(message)
