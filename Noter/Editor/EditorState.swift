@@ -26,19 +26,49 @@ final class EditorState: ObservableObject {
 
     func open(_ note: Note) {
         flush()
-        currentNote = note
-        body = note.body
-        lastPersistedSnapshot = Snapshot(url: note.url, body: note.body)
-        store.markOpened(note.url)
+        adopt(note)
     }
 
     /// Switch to a blank in-memory draft. Nothing is written to disk until the
     /// user types something and the autosave debounce fires.
     func startBlankDraft() {
         flush()
-        currentNote = nil
-        body = ""
-        lastPersistedSnapshot = nil
+        adopt(nil)
+    }
+
+    /// Deletes `note`, then moves the editor on if it was the open one.
+    ///
+    /// Order is the whole point. Callers used to delete first and switch notes
+    /// afterwards, but `open`/`startBlankDraft` flush on entry, so that flush
+    /// persisted the in-flight body back to the deleted note's original path.
+    /// The file reappeared in the live vault, untracked by the store — invisible
+    /// for the rest of the session, then listed again on the next launch as if
+    /// the delete never happened.
+    ///
+    /// Returns the note the editor moved to, or nil if it fell back to a draft.
+    @discardableResult
+    func delete(_ note: Note) throws -> Note? {
+        let wasOpen = currentNote?.url == note.url
+        flush()
+        // Flushing can rename the open note, which invalidates the URL the
+        // caller handed us, so re-resolve the target after persisting.
+        let target = wasOpen ? (currentNote?.url ?? note.url) : note.url
+        try store.delete(target)
+        guard wasOpen else { return currentNote }
+        adopt(store.notes.first)
+        return currentNote
+    }
+
+    /// Points the editor at `note`, or at a blank draft when nil, *without*
+    /// flushing. `open` and `startBlankDraft` flush before calling this;
+    /// `delete` must not, because the note being left no longer exists.
+    private func adopt(_ note: Note?) {
+        currentNote = note
+        body = note?.body ?? ""
+        lastPersistedSnapshot = note.map { Snapshot(url: $0.url, body: $0.body) }
+        if let note {
+            store.markOpened(note.url)
+        }
     }
 
     /// Persist any pending edits synchronously. Call when switching notes,

@@ -332,17 +332,12 @@ struct CommandPaletteOverlay: View {
     }
 
     private func deleteCurrent() {
-        guard let url = editor.currentNote?.url else { return }
+        guard let note = editor.currentNote else { return }
         do {
-            try store.delete(url)
+            try editor.delete(note)
         } catch {
             NSLog("[Noter] delete failed: \(error)")
             return
-        }
-        if let next = store.notes.first {
-            editor.open(next)
-        } else {
-            editor.startBlankDraft()
         }
         isShowing = false
     }

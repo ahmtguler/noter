@@ -122,19 +122,11 @@ struct SwitcherOverlay: View {
     }
 
     private func deleteNote(_ note: Note) {
-        let isOpen = editor.currentNote?.url == note.url
         do {
-            try store.delete(note.url)
+            try editor.delete(note)
         } catch {
             NSLog("[Noter] delete failed: \(error)")
             return
-        }
-        if isOpen {
-            if let next = store.notes.first {
-                editor.open(next)
-            } else {
-                editor.startBlankDraft()
-            }
         }
         if selectedIndex >= matches.count {
             selectedIndex = max(0, matches.count - 1)
