@@ -88,10 +88,7 @@ struct FirstLaunchView: View {
     }
 
     private func refreshVaultPath() {
-        if let url = VaultBookmark.resolve() {
-            vaultPath = url.path
-        } else {
-            vaultPath = ""
-        }
+        // Display only — see VaultBookmark.displayPath.
+        vaultPath = VaultBookmark.displayPath() ?? ""
     }
 }

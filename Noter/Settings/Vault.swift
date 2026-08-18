@@ -3,6 +3,7 @@ import Foundation
 /// Resolves the on-disk folder for notes. Prefers the user-chosen vault (via
 /// security-scoped bookmark) and falls back to the sandboxed app's Application
 /// Support directory if no vault is configured yet.
+@MainActor
 enum Vault {
     static func notesFolder(defaults: UserDefaults = .standard) throws -> URL {
         let raw = defaults.string(forKey: SettingsKey.subfolder) ?? ""

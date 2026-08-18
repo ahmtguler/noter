@@ -132,10 +132,9 @@ struct PreferencesView: View {
     }
 
     private func refreshVaultDisplay() {
-        if let url = VaultBookmark.resolve() {
-            vaultDisplay = url.path
-        } else {
-            vaultDisplay = ""
-        }
+        // displayPath, not resolve: this runs on every appearance just to show
+        // a string, and resolve acquires a security scope that is never given
+        // back.
+        vaultDisplay = VaultBookmark.displayPath() ?? ""
     }
 }
