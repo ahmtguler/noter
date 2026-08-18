@@ -213,7 +213,9 @@ final class NoteStore: ObservableObject {
 
     private func uniqueTrashURL(for filename: String) -> URL {
         let base = trashFolder.appendingPathComponent(filename)
-        if !fileManager.fileExists(atPath: base.path) { return base }
+        if !fileManager.fileExists(atPath: base.path) {
+            return base
+        }
         let stem = (filename as NSString).deletingPathExtension
         let ext = (filename as NSString).pathExtension
         var counter = 2
@@ -221,7 +223,9 @@ final class NoteStore: ObservableObject {
             let candidate = trashFolder.appendingPathComponent(
                 ext.isEmpty ? "\(stem) \(counter)" : "\(stem) \(counter).\(ext)"
             )
-            if !fileManager.fileExists(atPath: candidate.path) { return candidate }
+            if !fileManager.fileExists(atPath: candidate.path) {
+                return candidate
+            }
             counter += 1
         }
     }

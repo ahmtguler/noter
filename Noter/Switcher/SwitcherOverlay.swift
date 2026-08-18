@@ -110,7 +110,9 @@ struct SwitcherOverlay: View {
                     return nil
                 }
                 .sorted { lhs, rhs in
-                    if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
+                    if lhs.1 != rhs.1 {
+                        return lhs.1 > rhs.1
+                    }
                     return recencyKey(lhs.0) > recencyKey(rhs.0)
                 }
         }
@@ -226,8 +228,12 @@ struct SwitcherRow: View {
     }
 
     private var rowBackground: Color {
-        if isSelected { return Color.accentColor.opacity(0.22) }
-        if isHovering { return Color.primary.opacity(0.08) }
+        if isSelected {
+            return Color.accentColor.opacity(0.22)
+        }
+        if isHovering {
+            return Color.primary.opacity(0.08)
+        }
         return .clear
     }
 }

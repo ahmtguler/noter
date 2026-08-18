@@ -123,7 +123,9 @@ struct CommandPaletteOverlay: View {
         case .trash:
             // Trash mode also has the back/header bar (~44) + a divider (1pt).
             let trashChrome: CGFloat = listChrome + 45
-            if trashedSnapshot.isEmpty { return trashChrome + 130 }
+            if trashedSnapshot.isEmpty {
+                return trashChrome + 130
+            }
             return min(CGFloat(trashedSnapshot.count) * rowHeight + trashChrome, 420)
         }
     }
@@ -153,7 +155,9 @@ struct CommandPaletteOverlay: View {
     }
 
     private var trashHeaderSubtitle: String {
-        if trashedSnapshot.isEmpty { return "Empty" }
+        if trashedSnapshot.isEmpty {
+            return "Empty"
+        }
         let plural = trashedSnapshot.count == 1 ? "" : "s"
         return "\(trashedSnapshot.count) note\(plural) · auto-removed after 14 days"
     }
@@ -258,7 +262,9 @@ struct CommandPaletteOverlay: View {
                     next += delta
                 }
             }
-            if next < 0 || next > last { return }
+            if next < 0 || next > last {
+                return
+            }
             selectedIndex = next
         }
     }
@@ -368,7 +374,9 @@ struct CommandPaletteOverlay: View {
 
     private func clampSelection() {
         let last = max(0, trashedSnapshot.count - 1)
-        if selectedIndex > last { selectedIndex = last }
+        if selectedIndex > last {
+            selectedIndex = last
+        }
     }
 }
 
@@ -435,14 +443,22 @@ private struct CommandRow: View {
     }
 
     private var rowBackground: Color {
-        if isSelected { return Color.accentColor.opacity(0.22) }
-        if isHovering { return Color.primary.opacity(0.08) }
+        if isSelected {
+            return Color.accentColor.opacity(0.22)
+        }
+        if isHovering {
+            return Color.primary.opacity(0.08)
+        }
         return .clear
     }
 
     private var iconStyle: AnyShapeStyle {
-        if !command.isEnabled { return AnyShapeStyle(HierarchicalShapeStyle.tertiary) }
-        if command.isDestructive { return AnyShapeStyle(Color.red) }
+        if !command.isEnabled {
+            return AnyShapeStyle(HierarchicalShapeStyle.tertiary)
+        }
+        if command.isDestructive {
+            return AnyShapeStyle(Color.red)
+        }
         return AnyShapeStyle(HierarchicalShapeStyle.primary)
     }
 
