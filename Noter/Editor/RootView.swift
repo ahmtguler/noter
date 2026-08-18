@@ -2,6 +2,26 @@ import AppKit
 import MarkdownEditor
 import SwiftUI
 
+/// Hosts `RootView` and keeps it supplied with the *live* `EditorState`.
+///
+/// `PanelController` builds its `NSHostingView` exactly once and never
+/// reassigns `rootView`, so a `RootView` that resolved `app.editor` inside its
+/// own `init` stayed bound to whichever instance existed the first time the
+/// popup was shown. `AppViewModel.reloadVault()` replaces both the store and
+/// the editor when the vault changes, which left every keystroke, new note and
+/// title-driven rename going to the *previous* vault for the rest of the
+/// session while the switcher listed the new one.
+///
+/// Resolving `app.editor` here instead means the lookup re-runs whenever
+/// `AppViewModel` publishes, so `RootView`'s observation follows the swap.
+struct RootContainerView: View {
+    @ObservedObject var app: AppViewModel
+
+    var body: some View {
+        RootView(app: app, editor: app.editor)
+    }
+}
+
 /// Main popup content: title bar at the top with the current note's filename
 /// and a pin toggle, the editor in the middle, the formatting toolbar at the
 /// bottom. ⌘P brings up the note switcher; ⌘N creates a new note.
@@ -25,9 +45,9 @@ struct RootView: View {
     private var editorFontSizeRaw = SettingsKey.defaultEditorFontSize
     @Environment(\.colorScheme) private var systemColorScheme
 
-    init(app: AppViewModel) {
+    init(app: AppViewModel, editor: EditorState) {
         self.app = app
-        _editor = ObservedObject(wrappedValue: app.editor)
+        _editor = ObservedObject(wrappedValue: editor)
     }
 
     var body: some View {
