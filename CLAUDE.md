@@ -76,6 +76,8 @@ The repo is **private on the free plan**, so GitHub branch protection is unavail
 
 The pre-commit lint pass runs `swiftlint --strict --quiet`; warnings fail the commit. Common gotchas this repo's `.swiftlint.yml` enforces: `opening_brace`, `cyclomatic_complexity`, `function_parameter_count <= 5`, `type_body_length`, `force_unwrapping`. SwiftFormat re-orders imports alphabetically, so don't manually order them.
 
+**SwiftFormat and SwiftLint disagree about multi-clause conditions.** Wrapping an `if let x = …, y` across lines makes SwiftFormat's `wrapMultilineStatementBraces` move the `{` onto its own line, which SwiftLint's `opening_brace` then rejects — an unfixable loop if you keep reformatting. Hoist the clauses into `let`s so the `if` fits on one line instead.
+
 Hooks degrade gracefully — missing `node_modules`, an ungenerated `Noter.xcodeproj`, or a Command-Line-Tools-only `xcode-select` each skip with a message rather than blocking, on the assumption CI enforces.
 
 **lefthook 2.x gotchas** (each cost a debugging round):
@@ -103,6 +105,7 @@ Two jobs. `js` on `ubuntu-latest` typechecks and rebuilds the bundle; `swift` on
 - **`editor.bundle.js` drift is a hard failure.** The `js` job rebuilds and diffs against the committed blob. esbuild is deterministic and `npm ci` pins the version, so the rebuild is byte-reproducible — verified identical across macOS arm64 and Linux x64. A Dependabot bump of `esbuild` will therefore fail this check until someone commits a rebuilt bundle; that's intended.
 - **SwiftFormat is pinned** via `.swiftformat-version`, downloaded from GitHub releases and placed ahead of `$PATH`. Its default ruleset changes between releases — 0.62 added `wrapIfStatementBodies`, which failed CI on code that formatted clean under local 0.61.1. Never rely on the runner image's copy. `make fmt` warns when the local install disagrees with the pin; upgrading is a deliberate PR carrying its own reformatting diff.
 - **`swift test --package-path Packages/MarkdownEditor` runs separately.** The `Noter` scheme's testables list only `NoterTests`, so package tests are invisible to `xcodebuild test`. They went un-run so long that the file stopped compiling (a missing `import Foundation`) without anyone noticing.
+- **The TypeScript sources have unit tests** (vitest, `npm test` / `make js-test`). Pure logic belongs in a module free of CodeMirror imports so it runs in plain Node without a DOM — `linkDestination.ts` is the pattern to copy.
 - Don't pin an exact `/Applications/Xcode_X.Y.app` path — that's how CI rotted unnoticed (the old macos-14/Xcode 15.4 pin couldn't read xcodegen's project format 77 or run Swift Testing). `swiftlint` is brew-installed; the image no longer ships it.
 - `.swiftlint.yml` excludes `.build` **as a glob** (`**/.build`). `swift test` generates sources under `Packages/MarkdownEditor/.build`, and a bare `.build` entry only matches the repo root, so SwiftLint walked in and reported 50 violations in generated code.
 

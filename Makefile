@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check fmt-version lint test test-app test-package build run clean ci generate hooks js js-install js-typecheck coverage outdated
+.PHONY: help fmt fmt-check fmt-version lint test test-app test-package build run clean ci generate hooks js js-install js-typecheck js-test coverage outdated
 
 PROJECT := Noter.xcodeproj
 SCHEME  := Noter
@@ -21,6 +21,7 @@ help:
 	@echo "  make run          - Build and launch app"
 	@echo "  make js           - Rebuild the CodeMirror bundle"
 	@echo "  make js-typecheck - Typecheck the TypeScript sources"
+	@echo "  make js-test      - Run the TypeScript unit tests (vitest)"
 	@echo "  make outdated     - Show newer versions of pinned dependencies"
 	@echo "  make ci           - Everything CI runs, in CI's order"
 	@echo "  make clean        - Clean build artifacts"
@@ -58,6 +59,9 @@ js-install:
 
 js-typecheck:
 	cd $(JS_DIR) && npm run typecheck
+
+js-test:
+	cd $(JS_DIR) && npm test
 
 js:
 	cd $(JS_DIR) && npm run build
@@ -99,4 +103,4 @@ clean:
 	rm -rf .build DerivedData TestResults.xcresult
 
 # Mirrors .github/workflows/ci.yml so a green `make ci` means a green pipeline.
-ci: js-typecheck js fmt-check lint test build
+ci: js-typecheck js-test js fmt-check lint test build

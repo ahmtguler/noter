@@ -43,6 +43,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Test
+        run: npm test
+
       # editor.bundle.js is committed so `swift build` works without Node. That
       # trade-off is only safe if something proves the blob still matches its
       # sources — esbuild is deterministic and npm ci pins the version, so a
