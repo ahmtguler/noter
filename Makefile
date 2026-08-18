@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check fmt-version lint lint-version test test-app test-package build run clean ci generate hooks js js-install js-typecheck js-test coverage outdated
+.PHONY: help fmt fmt-check fmt-version lint lint-version test test-app test-package build run install uninstall clean ci generate hooks js js-install js-typecheck js-test coverage outdated
 
 PROJECT := Noter.xcodeproj
 SCHEME  := Noter
@@ -20,7 +20,9 @@ help:
 	@echo "  make test         - Run app + package tests"
 	@echo "  make coverage     - Run app tests and print per-target coverage"
 	@echo "  make build        - Release build"
-	@echo "  make run          - Build and launch app"
+	@echo "  make run          - Build and launch app from DerivedData"
+	@echo "  make install      - Build and install to /Applications (for daily use)"
+	@echo "  make uninstall    - Remove /Applications/Noter.app"
 	@echo "  make js           - Rebuild the CodeMirror bundle"
 	@echo "  make js-typecheck - Typecheck the TypeScript sources"
 	@echo "  make js-test      - Run the TypeScript unit tests (vitest)"
@@ -111,6 +113,32 @@ build:
 run: build
 	@APP_PATH=$$(xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Release -showBuildSettings 2>/dev/null | awk -F'= ' '/CODESIGNING_FOLDER_PATH/ {print $$2; exit}'); \
 	open -n "$$APP_PATH"
+
+# Installs the app you actually use day to day.
+#
+# `make run` launches straight out of DerivedData, which is fine for a quick
+# check but a bad home for the copy you rely on: `make clean`, Xcode's Clean
+# Build Folder, and macOS storage cleanup all delete it, and the path carries a
+# random hash. Copying to /Applications makes it a normal app — Spotlight finds
+# it, Login Items can launch it, and rebuilding doesn't disturb it.
+#
+# The running instance is quit first: replacing a bundle underneath a live
+# process leaves it running stale code with its resources pulled away.
+install: build
+	@APP_PATH=$$(xcodebuild -project $(PROJECT) -scheme $(SCHEME) -configuration Release -showBuildSettings 2>/dev/null | awk -F'= ' '/CODESIGNING_FOLDER_PATH/ {print $$2; exit}'); \
+	if [ ! -d "$$APP_PATH" ]; then echo "❌ build produced no app at $$APP_PATH"; exit 1; fi; \
+	pkill -f "Noter.app/Contents/MacOS/Noter" 2>/dev/null || true; \
+	sleep 1; \
+	rm -rf "/Applications/Noter.app"; \
+	cp -R "$$APP_PATH" "/Applications/Noter.app"; \
+	echo "✅ Installed /Applications/Noter.app"; \
+	echo "   Preferences and the vault bookmark live in the sandbox container,"; \
+	echo "   keyed to the bundle id, so they survive reinstalls."
+
+uninstall:
+	@pkill -f "Noter.app/Contents/MacOS/Noter" 2>/dev/null || true
+	@rm -rf "/Applications/Noter.app"
+	@echo "Removed /Applications/Noter.app (preferences and notes left alone)."
 
 clean:
 	xcodebuild clean -project $(PROJECT) -scheme $(SCHEME)
