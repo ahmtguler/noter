@@ -20,7 +20,11 @@ settings:
 packages:
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
-    from: "2.2.1"
+    # Exact, not `from:`. Package.resolved lives inside the gitignored
+    # Noter.xcodeproj, so a range let CI and local dev silently resolve
+    # different versions — `from: "2.2.1"` was already floating up to 2.4.0.
+    # Pinning here is the lockfile. 3.0.1 exists; bump deliberately.
+    exactVersion: "2.4.0"
   MarkdownEditor:
     path: Packages/MarkdownEditor
 

@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check fmt-version lint test test-app test-package build run clean ci generate hooks js js-install js-typecheck coverage
+.PHONY: help fmt fmt-check fmt-version lint test test-app test-package build run clean ci generate hooks js js-install js-typecheck coverage outdated
 
 PROJECT := Noter.xcodeproj
 SCHEME  := Noter
@@ -21,6 +21,7 @@ help:
 	@echo "  make run          - Build and launch app"
 	@echo "  make js           - Rebuild the CodeMirror bundle"
 	@echo "  make js-typecheck - Typecheck the TypeScript sources"
+	@echo "  make outdated     - Show newer versions of pinned dependencies"
 	@echo "  make ci           - Everything CI runs, in CI's order"
 	@echo "  make clean        - Clean build artifacts"
 
@@ -60,6 +61,18 @@ js-typecheck:
 
 js:
 	cd $(JS_DIR) && npm run build
+
+# Dependencies are pinned exactly and Dependabot's version PRs are off, so
+# upgrades are a deliberate act. This is how you find out what's available.
+outdated:
+	@echo "npm (Packages/MarkdownEditor/JS):"
+	@cd $(JS_DIR) && npm outdated || true
+	@echo ""
+	@echo "SwiftPM (pinned in project.yml):"
+	@grep -E 'exactVersion' project.yml | sed 's/^/  current:/'
+	@printf '  latest:  '
+	@gh api repos/sindresorhus/KeyboardShortcuts/releases/latest --jq '.tag_name' 2>/dev/null \
+		|| echo '(gh unavailable)'
 
 test-package:
 	swift test --package-path $(PACKAGE)

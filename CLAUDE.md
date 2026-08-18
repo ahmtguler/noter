@@ -83,6 +83,18 @@ Hooks degrade gracefully — missing `node_modules`, an ungenerated `Noter.xcode
 - `piped: true` on `pre-push` is deliberate: without it a rejected branch name still pays for a full Debug build and both test suites before reporting.
 - lefthook skips the **entire** `pre-push` hook when the push carries no file changes, so a metadata-only amend-and-force-push to `main` slips past the guard. Real pushes always carry files and are guarded. Don't treat the guard as airtight — it's a speed bump, not branch protection.
 
+## Dependencies (pinned, upgraded on purpose)
+
+**Every dependency is pinned to an exact version, and Dependabot does not open pull requests.** Routine version-bump PRs were pure noise on a solo project, so `.github/dependabot.yml` is deliberately gone. Don't add it back.
+
+What's still on: **Dependabot alerts**, which *warn* about vulnerabilities in the Security tab without creating branches or PRs. Automated security-update PRs are explicitly disabled on the repo.
+
+- `Packages/MarkdownEditor/JS/package.json` uses exact versions, **no `^` ranges**. A caret let a fresh `npm install` pull different code than the lockfile, which the bundle-drift check would then flag as a mystery failure.
+- `project.yml` pins SwiftPM with **`exactVersion`**, not `from:`. `Package.resolved` lives inside the gitignored `Noter.xcodeproj`, so nothing else in the repo records the version — `from: "2.2.1"` had already floated to 2.4.0 with no record of it. The `exactVersion` line *is* the lockfile.
+- GitHub Actions are pinned to major tags in the workflow.
+
+Run **`make outdated`** to see what's newer. Upgrading is then a normal PR: bump the pins, rebuild the bundle, let CI prove it. KeyboardShortcuts 3.x exists and is a deliberate future decision, not an automatic one.
+
 ## CI (`.github/workflows/ci.yml`)
 
 Two jobs. `js` on `ubuntu-latest` typechecks and rebuilds the bundle; `swift` on `macos-26` does everything else and `needs: js`, so a stale bundle or type error fails in seconds instead of spending macOS runner minutes (billed at **10x** on private repos). `concurrency: cancel-in-progress` kills superseded runs.
