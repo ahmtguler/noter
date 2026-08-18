@@ -12,6 +12,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var app: AppViewModel?
 
     func applicationDidFinishLaunching(_: Notification) {
+        // Re-apply the launch-at-login intent before anything else. Installing a
+        // new build replaces the app bundle, which can invalidate the existing
+        // SMAppService registration — without this the feature would quietly
+        // stop working after an update, with nothing in the UI looking wrong.
+        LoginItem.reconcile()
+
         do {
             let viewModel = try AppViewModel()
             app = viewModel

@@ -12,6 +12,10 @@ enum SettingsKey {
     static let showFormattingToolbar = "noter.showFormattingToolbar"
     static let editorTheme = "noter.editorTheme"
     static let editorFontSize = "noter.editorFontSize"
+    /// The user's intent for launching at login. `LoginItem` reconciles this
+    /// against what SMAppService has actually registered — see the note there
+    /// on why both exist.
+    static let launchAtLogin = "noter.launchAtLogin"
     /// Array of file paths (strings) for pinned notes. Pinned notes sort to
     /// the top of the switcher.
     static let pinnedNotes = "noter.pinnedNotes"
