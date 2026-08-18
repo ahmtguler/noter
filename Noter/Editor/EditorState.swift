@@ -59,6 +59,28 @@ final class EditorState: ObservableObject {
         return currentNote
     }
 
+    /// Re-points the editor at the store's copy of the open note after the
+    /// store has been reloaded from disk.
+    ///
+    /// Callers flush before reloading, so the editor's own edits are already on
+    /// disk by this point and anything that still differs came from outside
+    /// Noter — Obsidian, or a sync client. That version wins, otherwise the
+    /// next autosave would overwrite it with Noter's stale in-memory copy.
+    func resyncWithStore() {
+        guard let current = currentNote else { return }
+        guard let fresh = store.notes.first(where: { $0.url == current.url }) else {
+            // The open note was deleted or moved outside Noter.
+            adopt(store.notes.first)
+            return
+        }
+        guard fresh.body != body else {
+            // Same content; just refresh the metadata.
+            currentNote = fresh
+            return
+        }
+        adopt(fresh)
+    }
+
     /// Points the editor at `note`, or at a blank draft when nil, *without*
     /// flushing. `open` and `startBlankDraft` flush before calling this;
     /// `delete` must not, because the note being left no longer exists.

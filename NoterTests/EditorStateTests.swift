@@ -219,6 +219,81 @@ struct EditorStateTests {
             #expect(onDisk.contains("still being typed"))
         }
     }
+
+    // MARK: - Picking up external changes
+
+    /// The vault is shared with Obsidian, so a note can change under the app.
+    /// The store only loaded `notes` in `init`, so that edit stayed invisible
+    /// and the next autosave overwrote it with Noter's stale copy.
+    @Test
+    func resyncAdoptsAnEditMadeOutsideTheApp() throws {
+        try withTempFolder { folder in
+            let store = try NoteStore(folder: folder)
+            let editor = EditorState(store: store)
+            let note = try store.createNote(initialBody: "# Shared")
+            editor.open(note)
+
+            // Simulate Obsidian writing to the same file.
+            try "# Shared\n\nedited in Obsidian".write(to: note.url, atomically: true, encoding: .utf8)
+            try store.reload()
+            editor.resyncWithStore()
+
+            #expect(editor.body.contains("edited in Obsidian"))
+        }
+    }
+
+    /// And the edit must survive the next save rather than being clobbered.
+    @Test
+    func anExternalEditIsNotOverwrittenByTheNextFlush() throws {
+        try withTempFolder { folder in
+            let store = try NoteStore(folder: folder)
+            let editor = EditorState(store: store)
+            let note = try store.createNote(initialBody: "# Shared")
+            editor.open(note)
+
+            try "# Shared\n\nedited in Obsidian".write(to: note.url, atomically: true, encoding: .utf8)
+            try store.reload()
+            editor.resyncWithStore()
+            editor.flush()
+
+            let onDisk = try String(contentsOf: note.url, encoding: .utf8)
+            #expect(onDisk.contains("edited in Obsidian"))
+        }
+    }
+
+    @Test
+    func resyncMovesOnWhenTheOpenNoteDisappearsExternally() throws {
+        try withTempFolder { folder in
+            let store = try NoteStore(folder: folder)
+            let editor = EditorState(store: store)
+            let note = try store.createNote(initialBody: "# Gone")
+            _ = try store.createNote(initialBody: "# Survivor")
+            editor.open(note)
+
+            try FileManager.default.removeItem(at: note.url)
+            try store.reload()
+            editor.resyncWithStore()
+
+            #expect(editor.currentNote?.url != note.url)
+            #expect(editor.body.contains("Survivor"))
+        }
+    }
+
+    @Test
+    func resyncLeavesAnUnchangedNoteAlone() throws {
+        try withTempFolder { folder in
+            let store = try NoteStore(folder: folder)
+            let editor = EditorState(store: store)
+            let note = try store.createNote(initialBody: "# Stable")
+            editor.open(note)
+
+            try store.reload()
+            editor.resyncWithStore()
+
+            #expect(editor.currentNote?.url == note.url)
+            #expect(editor.body == "# Stable")
+        }
+    }
 }
 
 @MainActor

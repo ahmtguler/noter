@@ -20,10 +20,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 AnyView(RootContainerView(app: viewModel))
             })
             controller.onWillShow = { [weak controller] in
-                // Cheap opportunistic purge — runs every time the popup opens
-                // so trash entries older than 14 days don't accumulate even
-                // if the app is left running for weeks.
-                viewModel.store.purgeExpiredTrash()
+                // Re-read the vault every time the popup opens, so notes edited
+                // in Obsidian (or arriving via sync) while Noter ran are picked
+                // up instead of being overwritten by the next autosave. This
+                // also purges trash older than 14 days, since reload() does.
+                viewModel.refreshFromDisk()
                 guard let controller else { return }
                 let minutes = UserDefaults.standard.object(forKey: SettingsKey.idleNewNoteMinutes) as? Int
                     ?? SettingsKey.defaultIdleNewNoteMinutes
