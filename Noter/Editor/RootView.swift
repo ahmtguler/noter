@@ -418,17 +418,11 @@ struct RootView: View {
     /// next note (or a fresh draft). No-op on an unsaved blank draft — there's
     /// nothing on disk to remove, so `currentNote` is nil.
     private func deleteCurrentNote() {
-        guard let url = editor.currentNote?.url else { return }
+        guard let note = editor.currentNote else { return }
         do {
-            try app.store.delete(url)
+            try editor.delete(note)
         } catch {
             NSLog("[Noter] delete failed: \(error)")
-            return
-        }
-        if let next = app.store.notes.first {
-            editor.open(next)
-        } else {
-            editor.startBlankDraft()
         }
     }
 }
