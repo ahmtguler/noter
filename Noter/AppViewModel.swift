@@ -19,6 +19,29 @@ final class AppViewModel: ObservableObject {
         editor = EditorState(store: store)
     }
 
+    /// Picks up changes made to the vault outside Noter.
+    ///
+    /// `NoteStore.notes` was only ever populated in `init` and maintained
+    /// purely in memory afterwards — there is no file-system watcher. For an
+    /// app whose whole point is sharing an Obsidian vault, that meant a note
+    /// edited in Obsidian while Noter ran stayed invisible for the rest of the
+    /// session, and the next in-app save silently overwrote it with Noter's
+    /// stale copy. Called when the popup is about to appear, which is the
+    /// cheapest moment that reliably precedes the user reading or editing.
+    func refreshFromDisk() {
+        // Flush first so the editor's pending edits are on disk before the
+        // reload reads it back; otherwise resync would treat them as an
+        // external change and discard them.
+        editor.flush()
+        do {
+            try store.reload()
+        } catch {
+            NSLog("[Noter] vault refresh failed: \(error)")
+            return
+        }
+        editor.resyncWithStore()
+    }
+
     /// Re-resolves the vault folder and rebuilds store + editor. Called after the
     /// user picks a new vault path or changes the subfolder in Preferences.
     func reloadVault() {
