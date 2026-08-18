@@ -1,4 +1,4 @@
-.PHONY: help fmt fmt-check fmt-version lint test test-app test-package build run clean ci generate hooks js js-install js-typecheck js-test coverage outdated
+.PHONY: help fmt fmt-check fmt-version lint lint-version test test-app test-package build run clean ci generate hooks js js-install js-typecheck js-test coverage outdated
 
 PROJECT := Noter.xcodeproj
 SCHEME  := Noter
@@ -6,6 +6,7 @@ DEST    := platform=macOS
 JS_DIR  := Packages/MarkdownEditor/JS
 PACKAGE := Packages/MarkdownEditor
 SWIFTFORMAT_VERSION := $(shell tr -d '[:space:]' < .swiftformat-version)
+SWIFTLINT_VERSION   := $(shell tr -d '[:space:]' < .swiftlint-version)
 
 help:
 	@echo "Targets:"
@@ -14,6 +15,7 @@ help:
 	@echo "  make fmt          - SwiftFormat all sources"
 	@echo "  make fmt-check    - SwiftFormat in lint mode (no writes)"
 	@echo "  make fmt-version  - Warn if local SwiftFormat differs from the pin"
+	@echo "  make lint-version - Warn if local SwiftLint differs from the pin"
 	@echo "  make lint         - SwiftLint --strict"
 	@echo "  make test         - Run app + package tests"
 	@echo "  make coverage     - Run app tests and print per-target coverage"
@@ -51,7 +53,19 @@ fmt: fmt-version
 fmt-check: fmt-version
 	swiftformat --lint .
 
-lint:
+# Same reasoning as fmt-version: SwiftLint's rule set moves between releases,
+# and CI runs the pinned one.
+lint-version:
+	@installed="$$(swiftlint version 2>/dev/null)"; \
+	if [ -z "$$installed" ]; then \
+		echo "⚠️  SwiftLint is not installed. This repo pins $(SWIFTLINT_VERSION)."; \
+	elif [ "$$installed" != "$(SWIFTLINT_VERSION)" ]; then \
+		echo "⚠️  SwiftLint $$installed is installed, but this repo pins $(SWIFTLINT_VERSION)."; \
+		echo "    CI uses the pinned version, so results may differ."; \
+		echo "    Upgrade with: brew upgrade swiftlint"; \
+	fi
+
+lint: lint-version
 	swiftlint --strict
 
 js-install:
