@@ -38,7 +38,14 @@ enum InboundMessage: Decodable {
         case "textChanged":
             self = try .textChanged(text: container.decode(String.self, forKey: .text))
         case "selectionChanged":
-            self = try .selectionChanged(styles: container.decode(Set<MarkdownStyle>.self, forKey: .styles))
+            // Decoded leniently. Decoding straight into Set<MarkdownStyle>
+            // makes one unrecognised string throw and drop the whole message,
+            // so if the JS STYLE_NAMES list ever gains a style the Swift enum
+            // doesn't have, the entire toolbar would stop updating rather than
+            // one button — and the only symptom would be NSLog spam. Unknown
+            // names are skipped instead.
+            let names = try container.decode([String].self, forKey: .styles)
+            self = .selectionChanged(styles: Set(names.compactMap(MarkdownStyle.init(rawValue:))))
         case "log":
             self = try .logging(
                 level: container.decode(String.self, forKey: .level),
