@@ -11,6 +11,7 @@
 
 import { EditorView } from "@codemirror/view";
 import { syntaxTree } from "@codemirror/language";
+import { decodeLinkDestination } from "./linkDestination";
 
 interface BridgePost {
     (msg: object): void;
@@ -126,8 +127,8 @@ function linkAt(view: EditorView, pos: number): LinkAtPos | null {
             let urlNode = node.firstChild;
             while (urlNode) {
                 if (urlNode.type.name === "URL") {
-                    const url = view.state.sliceDoc(urlNode.from, urlNode.to).trim();
-                    return { url, from: node.from, to: node.to };
+                    const raw = view.state.sliceDoc(urlNode.from, urlNode.to).trim();
+                    return { url: decodeLinkDestination(raw), from: node.from, to: node.to };
                 }
                 urlNode = urlNode.nextSibling;
             }
