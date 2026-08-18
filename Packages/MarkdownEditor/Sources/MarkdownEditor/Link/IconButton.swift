@@ -27,7 +27,9 @@ struct IconButton: View {
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in isPressed = true }
                     .onEnded { _ in
-                        if isPressed { action() }
+                        if isPressed {
+                            action()
+                        }
                         isPressed = false
                     }
             )
@@ -35,8 +37,12 @@ struct IconButton: View {
     }
 
     private var background: Color {
-        if isPressed { return Color.primary.opacity(0.15) }
-        if isHovering { return Color.primary.opacity(0.08) }
+        if isPressed {
+            return Color.primary.opacity(0.15)
+        }
+        if isHovering {
+            return Color.primary.opacity(0.08)
+        }
         return .clear
     }
 }

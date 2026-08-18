@@ -146,11 +146,15 @@ struct RootView: View {
         // window's first responder, so the editor needs to reclaim it.
         .onChange(of: showSwitcher) { _, shown in
             syncEditorCursorSuppression()
-            if !shown { focusEditorAfterOverlay() }
+            if !shown {
+                focusEditorAfterOverlay()
+            }
         }
         .onChange(of: showCommandPalette) { _, shown in
             syncEditorCursorSuppression()
-            if !shown { focusEditorAfterOverlay() }
+            if !shown {
+                focusEditorAfterOverlay()
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .noterShowSwitcher)) { _ in
             showCommandPalette = false
@@ -335,7 +339,9 @@ struct RootView: View {
         // would only kick in based on rendered width and varies with
         // window size — the user wants a stable 28-chars + ellipsis.
         let limit = 30
-        if display.count <= limit { return display }
+        if display.count <= limit {
+            return display
+        }
         let stop = display.index(display.startIndex, offsetBy: 28)
         return display[..<stop] + "…"
     }
@@ -380,7 +386,9 @@ struct RootView: View {
     }
 
     private func ensureAnOpenNote() {
-        if editor.currentNote != nil || !editor.body.isEmpty { return }
+        if editor.currentNote != nil || !editor.body.isEmpty {
+            return
+        }
         if let first = app.store.notes.first {
             editor.open(first)
         } else {

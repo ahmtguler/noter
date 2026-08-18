@@ -53,7 +53,9 @@ enum Slugify {
 
     private static func suffixAsDuplicate(_ text: String) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty { return "(copy)" }
+        if trimmed.isEmpty {
+            return "(copy)"
+        }
         let copyPattern = #"^(.+?)\s*\(copy(?:\s+(\d+))?\)\s*$"#
         if let regex = try? NSRegularExpression(pattern: copyPattern) {
             let range = NSRange(location: 0, length: (trimmed as NSString).length)

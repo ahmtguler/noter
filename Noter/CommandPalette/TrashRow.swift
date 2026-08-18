@@ -50,8 +50,12 @@ struct TrashRow: View {
     }
 
     private var rowBackground: Color {
-        if isSelected { return Color.accentColor.opacity(0.22) }
-        if isHovering { return Color.primary.opacity(0.08) }
+        if isSelected {
+            return Color.accentColor.opacity(0.22)
+        }
+        if isHovering {
+            return Color.primary.opacity(0.08)
+        }
         return .clear
     }
 }

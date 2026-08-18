@@ -36,7 +36,9 @@ enum VaultBookmark {
         if let accessedURL {
             // Same vault as before: the scope is already held, and acquiring it
             // twice would need two releases.
-            if accessedURL == url { return url }
+            if accessedURL == url {
+                return url
+            }
             accessedURL.stopAccessingSecurityScopedResource()
             self.accessedURL = nil
         }

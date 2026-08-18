@@ -188,7 +188,9 @@ struct EditorWebView: NSViewRepresentable {
         private func handleTextChanged(_ text: String) {
             // Avoid the round-trip echo: only update the binding when the
             // editor's text differs from what we last pushed.
-            if text == lastSentText { return }
+            if text == lastSentText {
+                return
+            }
             lastSentText = text
             textBinding.wrappedValue = text
         }
@@ -224,13 +226,17 @@ struct EditorWebView: NSViewRepresentable {
         // MARK: Outbound
 
         private func pushConfigIfNeeded(force: Bool = false) {
-            if !force, lastSentConfig == configuration { return }
+            if !force, lastSentConfig == configuration {
+                return
+            }
             lastSentConfig = configuration
             bridge.send(.applyConfig(configuration))
         }
 
         private func pushTextIfNeeded(_ text: String, force: Bool = false) {
-            if !force, lastSentText == text { return }
+            if !force, lastSentText == text {
+                return
+            }
             lastSentText = text
             bridge.send(.setText(text))
         }

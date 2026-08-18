@@ -5,7 +5,9 @@ import Foundation
 /// of `target` (case-insensitive). Higher score = better match.
 enum FuzzyMatcher {
     static func score(query: String, in target: String) -> Int? {
-        if query.isEmpty { return 0 }
+        if query.isEmpty {
+            return 0
+        }
         let lowerQuery = Array(query.lowercased())
         let lowerTarget = Array(target.lowercased())
 
@@ -15,7 +17,9 @@ enum FuzzyMatcher {
         var consecutiveBonus = 0
 
         for (targetIndex, character) in lowerTarget.enumerated() {
-            if queryIndex >= lowerQuery.count { break }
+            if queryIndex >= lowerQuery.count {
+                break
+            }
             if character == lowerQuery[queryIndex] {
                 if previousMatchIndex == targetIndex - 1 {
                     consecutiveBonus += 5
