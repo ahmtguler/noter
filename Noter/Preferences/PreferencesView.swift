@@ -18,6 +18,10 @@ struct PreferencesView: View {
     @AppStorage(SettingsKey.editorFontSize)
     private var editorFontSizeRaw = SettingsKey.defaultEditorFontSize
     @State private var vaultDisplay = ""
+    /// Mirrors of `LoginItem` state. macOS owns the real registration, so these
+    /// are refreshed on appear rather than stored as `@AppStorage`.
+    @State private var launchAtLogin = false
+    @State private var launchNeedsApproval = false
 
     private let idleHelp = """
     After the popup has been hidden this long, the next time you open it you'll get a blank draft instead of \
@@ -92,11 +96,20 @@ struct PreferencesView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Toggle("Show formatting toolbar", isOn: $showFormattingToolbar)
+                Toggle("Launch at login", isOn: launchAtLoginBinding)
+                if launchNeedsApproval {
+                    Text("Approve Noter in System Settings › General › Login Items to finish enabling this.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
-        .frame(width: 520, height: 520)
-        .onAppear { refreshVaultDisplay() }
+        .frame(width: 520, height: 560)
+        .onAppear {
+            refreshVaultDisplay()
+            refreshLoginItem()
+        }
     }
 
     /// Bridges the raw-string @AppStorage to the strongly-typed enum the Picker uses.
@@ -129,6 +142,24 @@ struct PreferencesView: View {
         } catch {
             NSLog("[Noter] could not save vault bookmark: \(error)")
         }
+    }
+
+    /// Writes through to `LoginItem` and takes back whatever macOS settled on,
+    /// so a refused registration snaps the toggle off instead of showing a
+    /// state that isn't real.
+    private var launchAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { launchAtLogin },
+            set: { newValue in
+                launchAtLogin = LoginItem.setEnabled(newValue)
+                launchNeedsApproval = LoginItem.needsApproval
+            }
+        )
+    }
+
+    private func refreshLoginItem() {
+        launchAtLogin = LoginItem.isEnabled()
+        launchNeedsApproval = LoginItem.needsApproval
     }
 
     private func refreshVaultDisplay() {
