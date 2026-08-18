@@ -5,6 +5,7 @@
 
 import { EditorView } from "@codemirror/view";
 import { EditorSelection, ChangeSpec } from "@codemirror/state";
+import { encodeLinkDestination } from "./linkDestination";
 
 interface InlineWrap {
     prefix: string;
@@ -394,14 +395,14 @@ function applyLinkPayload(view: EditorView, arg: string | null) {
     if (from < 0 || to > view.state.doc.length || from >= to) return;
     const text = view.state.sliceDoc(from, to);
     // If the range is already a complete link, replace just the URL portion.
-    const linkPattern = /^\[([^\]]*)\]\(([^)]*)\)$/;
+    // The destination group is greedy so an angle-bracketed destination that
+    // itself contains ")" still matches as one link.
+    const linkPattern = /^\[([^\]]*)\]\((.*)\)$/s;
     const match = text.match(linkPattern);
-    let insert: string;
-    if (match) {
-        insert = `[${match[1]}](${url})`;
-    } else {
-        insert = `[${text}](${url})`;
-    }
+    const destination = encodeLinkDestination(url);
+    const insert = match
+        ? `[${match[1]}](${destination})`
+        : `[${text}](${destination})`;
     view.dispatch({
         changes: { from, to, insert },
         // Place caret just after the closing paren so subsequent typing is
