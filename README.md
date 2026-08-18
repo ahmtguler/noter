@@ -60,13 +60,23 @@ make run                # release build + launch
 
 On first launch you'll be asked to pick your Obsidian vault folder, set a subfolder, and record a global hotkey.
 
+### Installing it for real use
+
+`make run` launches straight out of DerivedData, which `make clean` and Xcode's Clean Build Folder both delete. For the copy you actually use, run `make install` — it puts the app in `/Applications`, where Spotlight finds it and Login Items can launch it at startup.
+
+Your notes are plain files in the vault and are never touched by a build. Preferences, the recorded hotkey, and the security-scoped vault bookmark live in the app's sandbox container keyed to the bundle identifier, so they survive rebuilds and reinstalls — you won't re-run onboarding.
+
+The app is **ad-hoc signed**, which is all macOS needs to run it on the machine that built it. No Apple Developer account is required for personal use; one is only needed to distribute signed, notarized builds to other people.
+
 > `Noter.xcodeproj` is generated and gitignored. Re-run `make generate` after editing `project.yml` or adding a Swift file in a new directory.
 
 ## Daily commands
 
 | Command | What it does |
 |---|---|
-| `make run` | Release build and launch the app |
+| `make run` | Release build and launch from DerivedData (quick check) |
+| `make install` | Release build and install to `/Applications` (for daily use) |
+| `make uninstall` | Remove `/Applications/Noter.app`, leaving notes and settings |
 | `make build` | Release build only |
 | `make test` | Run all tests (app + MarkdownEditor package) |
 | `make fmt` | Format all Swift sources with SwiftFormat |
