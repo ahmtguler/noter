@@ -13,7 +13,9 @@ final class PanelKeyMonitor {
         self.panel = panel
     }
 
-    deinit {
+    /// `isolated` so the deinit runs on the main actor, where the monitor token
+    /// lives — and where `NSEvent.removeMonitor` must be called anyway.
+    isolated deinit {
         if let monitor {
             NSEvent.removeMonitor(monitor)
         }
