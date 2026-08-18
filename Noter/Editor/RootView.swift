@@ -220,10 +220,7 @@ struct RootView: View {
             theme: resolvedTheme,
             fontSize: fontSizePreference.pointSize,
             spellCheck: true,
-            smartListContinuation: true,
-            revealMarkersOnCursor: true,
-            lineWrap: true,
-            contentPadding: 24
+            lineWrap: true
         )
     }
 

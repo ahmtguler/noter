@@ -45,10 +45,7 @@ export interface EditorConfig {
     theme: "system" | "light" | "dark";
     fontSize: number;
     spellCheck: boolean;
-    smartListContinuation: boolean;
-    revealMarkersOnCursor: boolean;
     lineWrap: boolean;
-    contentPadding: number;
 }
 
 function postToSwift(message: object) {

@@ -9,8 +9,6 @@ struct EditorConfigurationTests {
         #expect(config.theme == .system)
         #expect(config.fontSize == 14)
         #expect(config.spellCheck)
-        #expect(config.smartListContinuation)
-        #expect(config.revealMarkersOnCursor)
         #expect(config.lineWrap)
     }
 
