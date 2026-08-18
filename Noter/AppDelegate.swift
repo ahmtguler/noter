@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             app = viewModel
 
             let controller = PanelController(contentFactory: {
-                AnyView(RootView(app: viewModel))
+                AnyView(RootContainerView(app: viewModel))
             })
             controller.onWillShow = { [weak controller] in
                 // Cheap opportunistic purge — runs every time the popup opens
