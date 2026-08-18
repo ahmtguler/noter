@@ -89,6 +89,10 @@ npm run watch     # rebuild on every save while iterating
 
 CI verifies the committed bundle matches `JS/src/`, so a stale bundle fails the build rather than silently shipping.
 
+### Dependencies
+
+Everything is pinned to an exact version — no `^` ranges in `package.json`, `exactVersion` for SwiftPM. Dependabot never opens pull requests; it only *warns* about security advisories. Run `make outdated` to see what's newer, then upgrade deliberately in a normal PR.
+
 ## Development workflow
 
 This repo uses **trunk-based development**. `main` is always releasable and protected — no direct pushes.
