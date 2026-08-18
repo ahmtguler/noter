@@ -2,8 +2,8 @@ import Foundation
 
 /// User-facing knobs that survive the lifetime of the view. Pushed across the
 /// bridge as JSON whenever the value changes.
-public struct EditorConfiguration: Equatable, Codable {
-    public enum Theme: String, Codable {
+public struct EditorConfiguration: Equatable, Codable, Sendable {
+    public enum Theme: String, Codable, Sendable {
         case system
         case light
         case dark
