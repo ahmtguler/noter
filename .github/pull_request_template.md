@@ -27,7 +27,7 @@ Title must follow Conventional Commits: <type>(<scope>): <subject>
 - [ ] Commits follow Conventional Commits
 - [ ] Rebuilt `editor.bundle.js` if any `.ts` file changed
 - [ ] Ran `make generate` if `project.yml` or a new source directory changed
-- [ ] Updated `README.md` / `CLAUDE.md` if behaviour or architecture changed
+- [ ] Updated `README.md` / `AGENTS.md` if behaviour or architecture changed
 
 ## Screenshots
 
